@@ -129,18 +129,36 @@ def show_overlay_with_webcam(overlay_image_path):
 
     # Laden des Overlay-Bildes
     overlay = cv2.imread(overlay_image_path, cv2.IMREAD_UNCHANGED)
-    overlay = cv2.resize(overlay, (640, 480))
+
+    # Graustufen-Konvertierung und Kanten-Erkennung
+    gray_overlay = cv2.cvtColor(overlay, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray_overlay, 50, 150)
+
+    # Finden der Konturen des Overlays
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        # Overlay mit der Webcam-Ansicht kombinieren
-        blended_frame = cv2.addWeighted(frame, 0.7, overlay, 0.3, 0)
+        # Kanten-Erkennung auf dem Webcam-Frame
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        frame_edges = cv2.Canny(gray_frame, 50, 150)
+
+        # Finden der Konturen des Webcam-Frames
+        frame_contours, _ = cv2.findContours(frame_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Finden der ähnlichsten Kontur zur Ausrichtung des Overlays
+        for cnt in frame_contours:
+            match = cv2.matchShapes(contours[0], cnt, cv2.CONTOURS_MATCH_I1, 0.0)
+            if match < 0.1:  # Schwellenwert für Ähnlichkeit
+                x, y, w, h = cv2.boundingRect(cnt)
+                resized_overlay = cv2.resize(overlay, (w, h))
+                frame[y:y+h, x:x+w] = cv2.addWeighted(frame[y:y+h, x:x+w], 0.5, resized_overlay, 0.5, 0)
 
         # Anzeige des kombinierten Frames
-        cv2.imshow('Webcam mit Overlay', blended_frame)
+        cv2.imshow('Webcam mit Overlay', frame)
 
         # Beenden mit der Taste 'q'
         if cv2.waitKey(1) & 0xFF == ord('q'):
