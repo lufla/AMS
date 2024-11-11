@@ -1,24 +1,24 @@
 {
     "Header": {
         "Comment": "All values are metric (mm)",
-        "CreationDate": "2024-05-09T12:20:02Z",
+        "CreationDate": "2024-11-11T16:36:48Z",
         "GenerationSoftware": {
             "Application": "EAGLE",
             "Vendor": "Autodesk",
-            "Version": "9.6.2"
+            "Version": "9.6.0"
         },
         "Part": "Single"
     },
     "Overall": {
-        "BoardThickness": 1.57,
+        "BoardThickness": 1.67,
         "LayerNumber": 2,
         "Name": {
-            "ProjectId": "DVCU_04"
+            "ProjectId": "PP3_FPGA_Tester_v3"
         },
-        "Owner": "  <>",
+        "Owner": "Lukas Flad <lukasflad@arcor.de>",
         "Size": {
-            "X": 60,
-            "Y": 56.38
+            "X": 160,
+            "Y": 96.19
         }
     }
 }
