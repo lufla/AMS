@@ -5,6 +5,8 @@ import gerber
 from gerber.render.cairo_backend import GerberCairoContext
 import platform
 
+offset_x = 1
+offset_y = 1
 
 # Function to detect elements in Gerber files
 def detect_top_layer_elements(input_files):

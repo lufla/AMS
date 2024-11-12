@@ -1,0 +1,24 @@
+{
+    "Header": {
+        "Comment": "All values are metric (mm)",
+        "CreationDate": "2024-11-12T11:29:28Z",
+        "GenerationSoftware": {
+            "Application": "EAGLE",
+            "Vendor": "Autodesk",
+            "Version": "9.6.0"
+        },
+        "Part": "Single"
+    },
+    "Overall": {
+        "BoardThickness": 1.57,
+        "LayerNumber": 2,
+        "Name": {
+            "ProjectId": "AdapterPlatine"
+        },
+        "Owner": "Lukas Flad <lukasflad@arcor.de>",
+        "Size": {
+            "X": 92.611,
+            "Y": 93.205
+        }
+    }
+}
