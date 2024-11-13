@@ -30,24 +30,24 @@ def detect_top_layer_elements(input_files):
 
     return traces, pads, holes, outlines, pcb_profile
 
-
-# Function to create a transparent and vibrant image for the PCB overlay
+# Function to create a transparent and vibrant image for the PCB overlay with anti-aliasing
 def generate_vibrant_top_layer_image(outlines, pads, holes, pcb_profile, output_file='top_layer_image.png'):
     min_x, min_y, max_x, max_y = float('inf'), float('inf'), float('-inf'), float('-inf')
 
-    # Determine the bounding box for the PCB based on all elements
+    # Determine the bounding box for the PCB based on all elements, including profile lines
     for outline in outlines:
         x, y = outline.position
         width, height = outline.width, outline.height
         min_x, min_y = min(min_x, x - width / 2), min(min_y, y - height / 2)
         max_x, max_y = max(max_x, x + width / 2), max(max_y, y + height / 2)
 
-    padding = 5  # Small padding around the edges of the PCB
-    min_x -= padding
-    min_y -= padding
-    max_x += padding
-    max_y += padding
+    for line in pcb_profile:
+        min_x = min(min_x, line.start[0], line.end[0])
+        min_y = min(min_y, line.start[1], line.end[1])
+        max_x = max(max_x, line.start[0], line.end[0])
+        max_y = max(max_y, line.start[1], line.end[1])
 
+    # Calculate exact width and height for the PCB without padding
     width = int((max_x - min_x) * 90)
     height = int((max_y - min_y) * 90)
     img = np.zeros((height, width, 4), dtype=np.uint8)  # RGBA for transparency
@@ -72,55 +72,91 @@ def generate_vibrant_top_layer_image(outlines, pads, holes, pcb_profile, output_
         radius = int(hole.diameter / 4 * 90)
         cv2.circle(img, center, radius, (0, 255, 255, 200), -1)  # Vibrant yellow-green
 
+    # Draw PCB profile with magenta lines and add corner detection
     for line in pcb_profile:
         start = (int((line.start[0] - min_x) * 90), int((line.start[1] - min_y) * 90))
         end = (int((line.end[0] - min_x) * 90), int((line.end[1] - min_y) * 90))
-        cv2.line(img, start, end, (255, 255, 255, 200), 3)  # White lines for profile
+        cv2.line(img, start, end, (255, 0, 255, 200), 3)  # Magenta lines for profile
 
+        # Draw detected corners on the start and end points
+        cv2.circle(img, start, 5, (0, 255, 255, 255), -1)  # Yellow corner indicator at start
+        cv2.circle(img, end, 5, (0, 255, 255, 255), -1)    # Yellow corner indicator at end
+
+    # Apply Gaussian blur to reduce edge artifacts (anti-aliasing)
+    img = cv2.GaussianBlur(img, (5, 5), 0)
     cv2.imwrite(output_file, img)
 
-
-# Function to overlay the image on the PCB detected in the foreground
-def show_overlay_with_webcam(overlay_image_path):
+def show_overlay_with_webcam(overlay_image_path, calibration_data=None):
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW if platform.system() == 'Windows' else 0)
     if not cap.isOpened():
         raise IOError("Could not open webcam.")
 
-    # Load and mirror the overlay image
+    # Load overlay image with transparency and mirror it
     overlay = cv2.imread(overlay_image_path, cv2.IMREAD_UNCHANGED)
-    overlay = cv2.flip(overlay, 1)  # Flip horizontally
+    overlay = cv2.flip(overlay, 1)  # Flip horizontally to mirror the image
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        # Convert frame to HSV for color-based PCB detection
+        if calibration_data:
+            # Undistort the frame using calibration data if available
+            frame = cv2.undistort(frame, calibration_data['camera_matrix'], calibration_data['dist_coeffs'])
+
+        # Convert to HSV and apply color filter to detect the PCB (assumed green)
         hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        lower_green = np.array([30, 40, 40])  # Adjust these values to detect the PCB color
+        lower_green = np.array([30, 40, 40])
         upper_green = np.array([90, 255, 255])
         mask = cv2.inRange(hsv_frame, lower_green, upper_green)
+
+        # Apply Gaussian blur to smooth out the mask
+        mask = cv2.GaussianBlur(mask, (5, 5), 0)
+
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # Detect largest contour assuming it is the PCB
         if contours:
             largest_contour = max(contours, key=cv2.contourArea)
-            x, y, w, h = cv2.boundingRect(largest_contour)
-            resized_overlay = cv2.resize(overlay, (w, h))
+            epsilon = 0.02 * cv2.arcLength(largest_contour, True)
+            approx_corners = cv2.approxPolyDP(largest_contour, epsilon, True)
 
-            # Overlay the transparent image on the PCB area
-            overlay_alpha = resized_overlay[:, :, 3] / 255.0
-            for c in range(0, 3):
-                frame[y:y+h, x:x+w, c] = (overlay_alpha * resized_overlay[:, :, c] +
-                                          (1 - overlay_alpha) * frame[y:y+h, x:x+w, c])
+            if len(approx_corners) == 4:
+                # Sort the detected corners in a consistent order
+                approx_corners = sorted(approx_corners, key=lambda x: x[0][1])
+                top_points = sorted(approx_corners[:2], key=lambda x: x[0][0])
+                bottom_points = sorted(approx_corners[2:], key=lambda x: x[0][0])
+                src_points = np.float32([top_points[0][0], top_points[1][0], bottom_points[1][0], bottom_points[0][0]])
 
-        cv2.imshow('Webcam with Overlay', frame)
+                # Define destination points on the mirrored overlay for alignment
+                dst_points = np.float32([
+                    [0, 0],
+                    [overlay.shape[1], 0],
+                    [overlay.shape[1], overlay.shape[0]],
+                    [0, overlay.shape[0]]
+                ])
+
+                # Apply perspective transform to fit the overlay precisely on the PCB
+                matrix = cv2.getPerspectiveTransform(dst_points, src_points)
+                transformed_overlay = cv2.warpPerspective(overlay, matrix, (frame.shape[1], frame.shape[0]))
+
+                # Overlay with transparency
+                overlay_alpha = transformed_overlay[:, :, 3] / 255.0
+                for c in range(0, 3):
+                    frame[:, :, c] = (overlay_alpha * transformed_overlay[:, :, c] +
+                                      (1 - overlay_alpha) * frame[:, :, c])
+
+        # Resize the frame for a larger display window
+        larger_frame = cv2.resize(frame, None, fx=2, fy=2)
+
+        cv2.imshow('Webcam with Larger Mirrored Overlay', larger_frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     cap.release()
     cv2.destroyAllWindows()
 
+# Optional: Provide calibration data if available
+# calibration_data = {'camera_matrix': camera_matrix, 'dist_coeffs': dist_coeffs}
 
 if __name__ == "__main__":
     gerber_directory = os.path.join(os.path.dirname(__file__), 'PP3_FPGA_Tester', 'CAMOutputs', 'GerberFiles')
