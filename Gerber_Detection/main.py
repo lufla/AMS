@@ -1,142 +1,217 @@
-import os
 import cv2
 import numpy as np
-import gerber
-from gerber.render.cairo_backend import GerberCairoContext
-import platform
-
-offset_x = 1
-offset_y = 1
-
-# Function to detect elements in Gerber files
-def detect_top_layer_elements(input_files):
-    traces, pads, holes, outlines, pcb_profile = [], [], [], [], []
-
-    for file in input_files:
-        gerber_file = gerber.read(file)
-        for primitive in gerber_file.primitives:
-            if isinstance(primitive, gerber.primitives.Line):
-                if 'profile' in file.lower():
-                    pcb_profile.append(primitive)
-                else:
-                    traces.append(primitive)
-            elif isinstance(primitive, gerber.primitives.Circle):
-                if primitive.hole_diameter > 0:
-                    holes.append(primitive)
-                else:
-                    pads.append(primitive)
-            elif isinstance(primitive, gerber.primitives.Rectangle) or isinstance(primitive, gerber.primitives.Obround):
-                outlines.append(primitive)
-
-    return traces, pads, holes, outlines, pcb_profile
+import pandas as pd
+import os
+from gerber import load_layer
 
 
-# Function to create a transparent and vibrant image for the PCB overlay
-def generate_vibrant_top_layer_image(outlines, pads, holes, pcb_profile, output_file='top_layer_image.png'):
-    min_x, min_y, max_x, max_y = float('inf'), float('inf'), float('-inf'), float('-inf')
+def load_component_data(front_file, back_file, other_files):
+    # Load component data from front, back, and other files
+    front_data = pd.read_csv(front_file, delimiter='\t', header=None,
+                             names=['ID', 'X', 'Y', 'Rotation', 'Value', 'Package'])
+    back_data = pd.read_csv(back_file, delimiter='\t', header=None,
+                            names=['ID', 'X', 'Y', 'Rotation', 'Value', 'Package'])
+    all_data = [front_data, back_data]
 
-    # Determine the bounding box for the PCB based on all elements
-    for outline in outlines:
-        x, y = outline.position
-        width, height = outline.width, outline.height
-        min_x, min_y = min(min_x, x - width / 2), min(min_y, y - height / 2)
-        max_x, max_y = max(max_x, x + width / 2), max(max_y, y + height / 2)
+    # Load other component or pad data from additional files
+    for file in other_files:
+        if file.endswith('.txt'):
+            data = pd.read_csv(file, delimiter='\t', header=None,
+                               names=['ID', 'X', 'Y', 'Rotation', 'Value', 'Package'])
+            all_data.append(data)
 
-    padding = 5  # Small padding around the edges of the PCB
-    min_x -= padding
-    min_y -= padding
-    max_x += padding
-    max_y += padding
-
-    width = int((max_x - min_x) * 90)
-    height = int((max_y - min_y) * 90)
-    img = np.zeros((height, width, 4), dtype=np.uint8)  # RGBA for transparency
-
-    # Draw outlines and components with vibrant colors
-    for outline in outlines:
-        top_left = (int((outline.position[0] - outline.width / 2 - min_x) * 90),
-                    int((outline.position[1] - outline.height / 2 - min_y) * 90))
-        bottom_right = (int((outline.position[0] + outline.width / 2 - min_x) * 90),
-                        int((outline.position[1] + outline.height / 2 - min_y) * 90))
-
-        color = (0, 255, 0, 200) if outline.width > 10 and outline.height > 10 else (0, 0, 255, 200)
-        cv2.rectangle(img, top_left, bottom_right, color, -1)
-
-    for pad in pads:
-        center = (int((pad.position[0] - min_x) * 90), int((pad.position[1] - min_y) * 90))
-        radius = int(pad.diameter / 4 * 90)
-        cv2.circle(img, center, radius, (255, 0, 0, 200), -1)  # Vibrant blue
-
-    for hole in holes:
-        center = (int((hole.position[0] - min_x) * 90), int((hole.position[1] - min_y) * 90))
-        radius = int(hole.diameter / 4 * 90)
-        cv2.circle(img, center, radius, (0, 255, 255, 200), -1)  # Vibrant yellow-green
-
-    for line in pcb_profile:
-        start = (int((line.start[0] - min_x) * 90), int((line.start[1] - min_y) * 90))
-        end = (int((line.end[0] - min_x) * 90), int((line.end[1] - min_y) * 90))
-        cv2.line(img, start, end, (255, 255, 255, 200), 3)  # White lines for profile
-
-    cv2.imwrite(output_file, img)
+    # Combine all data into one DataFrame and drop rows with missing values
+    combined_data = pd.concat(all_data, ignore_index=True).dropna(subset=['X', 'Y'])
+    return combined_data
 
 
-# Function to overlay the image on the PCB detected in the foreground
-def show_overlay_with_webcam(overlay_image_path):
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW if platform.system() == 'Windows' else 0)
-    if not cap.isOpened():
-        raise IOError("Could not open webcam.")
+def parse_gerber_files(gerber_files):
+    pads = []
+    for file in gerber_files:
+        if file.endswith('.gbr') or file.endswith('.xln'):
+            layer = load_layer(file)
+            for primitive in layer.primitives:
+                if hasattr(primitive, 'position'):
+                    pads.append((primitive.position[0], primitive.position[1]))
+    return pads
 
-    # Load and mirror the overlay image
-    overlay = cv2.imread(overlay_image_path, cv2.IMREAD_UNCHANGED)
-    overlay = cv2.flip(overlay, 1)  # Flip horizontally
+
+def detect_shapes(frame, overlay, components, pads):
+    # Convert the frame to grayscale
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Apply Gaussian Blur
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    # Detect edges using Canny Edge Detection
+    edges = cv2.Canny(blurred, 50, 150)
+
+    # Find contours from edges detected
+    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    for contour in contours:
+        # Approximate the contour to reduce the number of points
+        approx = cv2.approxPolyDP(contour, 0.04 * cv2.arcLength(contour, True), True)
+
+        # Filter out small or very large contours to reduce clutter
+        area = cv2.contourArea(contour)
+        if area < 100 or area > 5000:
+            continue
+
+        # Draw bounding shapes for squares and circles
+        if len(approx) == 4:  # Square or Rectangle
+            x, y, w, h = cv2.boundingRect(approx)
+            aspect_ratio = float(w) / h
+            if 0.9 <= aspect_ratio <= 1.1:  # Ensure it is a square
+                cv2.drawContours(overlay, [approx], 0, (0, 0, 255), 3)  # Red color, thicker line
+                cv2.putText(overlay, 'Square', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        elif len(approx) > 7:  # Circle
+            ((x, y), radius) = cv2.minEnclosingCircle(contour)
+            if 10 < radius < 50:
+                cv2.circle(overlay, (int(x), int(y)), int(radius), (255, 0, 255), 3)  # Magenta color, thicker line
+                cv2.putText(overlay, 'Circle', (int(x) - 10, int(y) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 255), 2)
+
+    # Overlay component data on the frame
+    for _, row in components.iterrows():
+        comp_x, comp_y = int(row['X']), int(row['Y'])
+        # Adjust component coordinates to align properly with the frame
+        frame_height, frame_width = frame.shape[:2]
+        adjusted_x = int(comp_x * frame_width / 100)  # Assuming coordinates are in percentage
+        adjusted_y = int(comp_y * frame_height / 100)
+        # Mirror the x-coordinate for the overlay
+        mirrored_x = frame_width - adjusted_x
+        cv2.putText(overlay, row['ID'], (mirrored_x, adjusted_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)  # Green color, thicker text
+        cv2.circle(overlay, (mirrored_x, adjusted_y), 5, (0, 255, 0), -1)  # Green color, larger circle
+
+    # Overlay pad data from Gerber files
+    for pad_x, pad_y in pads:
+        # Adjust pad coordinates to align properly with the frame
+        adjusted_x = int(pad_x * frame_width / 100)
+        adjusted_y = int(pad_y * frame_height / 100)
+        # Mirror the x-coordinate for the overlay
+        mirrored_x = frame_width - adjusted_x
+        cv2.circle(overlay, (mirrored_x, adjusted_y), 5, (255, 255, 0), -1)  # Yellow color, larger circle
+
+
+def detect_pcb(frame):
+    # Convert frame to grayscale
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Apply GaussianBlur to reduce noise and improve edge detection
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    # Use Canny Edge Detection to find edges in the frame
+    edges = cv2.Canny(blurred, 50, 150)
+
+    # Find contours from edges detected
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Iterate through contours to find the largest rectangular contour
+    largest_contour = None
+    max_area = 0
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area > max_area:
+            approx = cv2.approxPolyDP(contour, 0.02 * cv2.arcLength(contour, True), True)
+            if len(approx) == 4:  # Look for quadrilateral shapes (rectangles)
+                largest_contour = approx
+                max_area = area
+
+    # If a PCB-like contour is found, return the bounding box with improved certainty
+    if largest_contour is not None:
+        x, y, w, h = cv2.boundingRect(largest_contour)
+        # Expand the bounding box slightly to ensure full PCB is included
+        padding = 10
+        x = max(x - padding, 0)
+        y = max(y - padding, 0)
+        w = min(w + 2 * padding, frame.shape[1] - x)
+        h = min(h + 2 * padding, frame.shape[0] - y)
+        return x, y, w, h
+    else:
+        return None
+
+
+def save_overlay_image(frame, overlay, output_file):
+    # Combine the original frame with the overlay
+    combined = cv2.addWeighted(frame, 0.8, overlay, 0.2, 0)
+    # Save the resulting image
+    cv2.imwrite(output_file, combined)
+
+
+# Main function to run webcam and detect shapes
+def main():
+    # Load component data
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    front_file = os.path.join(script_dir, 'PnP_PP3_FPGA_Tester_v3_front.txt')
+    back_file = os.path.join(script_dir, 'PnP_PP3_FPGA_Tester_v3_back.txt')
+    other_files = [
+        os.path.join(script_dir, 'PP3_FPGA_Tester_v3.txt'),
+    ]
+    gerber_files = [
+        os.path.join(script_dir, 'copper_top.gbr'),
+        os.path.join(script_dir, 'drill_1_16.xln'),
+        os.path.join(script_dir, 'profile.gbr'),
+        os.path.join(script_dir, 'silkscreen_top.gbr'),
+        os.path.join(script_dir, 'soldermask_top.gbr'),
+        os.path.join(script_dir, 'solderpaste_top.gbr')
+    ]
+
+    # Load component data (front, back, and additional data)
+    combined_data = load_component_data(front_file, back_file, other_files)
+
+    # Parse Gerber files to extract pad locations
+    pads = parse_gerber_files(gerber_files)
+
+    # Start the video capture from the webcam
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)  # Set the width of the window
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)  # Set the height of the window
+    overlay = None
 
     while True:
+        # Capture frame-by-frame
         ret, frame = cap.read()
+
         if not ret:
             break
 
-        # Convert frame to HSV for color-based PCB detection
-        hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        lower_green = np.array([30, 40, 40])  # Adjust these values to detect the PCB color
-        upper_green = np.array([90, 255, 255])
-        mask = cv2.inRange(hsv_frame, lower_green, upper_green)
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Detect PCB in the frame
+        pcb_bbox = detect_pcb(frame)
 
-        # Detect largest contour assuming it is the PCB
-        if contours:
-            largest_contour = max(contours, key=cv2.contourArea)
-            x, y, w, h = cv2.boundingRect(largest_contour)
-            resized_overlay = cv2.resize(overlay, (w, h))
+        if pcb_bbox is not None:
+            x, y, w, h = pcb_bbox
+            # Crop the frame to the detected PCB area
+            pcb_frame = frame[y:y+h, x:x+w]
 
-            # Overlay the transparent image on the PCB area
-            overlay_alpha = resized_overlay[:, :, 3] / 255.0
-            for c in range(0, 3):
-                frame[y:y+h, x:x+w, c] = (overlay_alpha * resized_overlay[:, :, c] +
-                                          (1 - overlay_alpha) * frame[y:y+h, x:x+w, c])
+            # Initialize the overlay image with the same size as the PCB area
+            overlay = np.zeros_like(pcb_frame)
 
-        cv2.imshow('Webcam with Overlay', frame)
+            # Detect and visualize shapes in the cropped PCB area
+            detect_shapes(pcb_frame, overlay, combined_data, pads)
+
+            # Combine the cropped PCB frame with the overlay
+            combined = cv2.addWeighted(pcb_frame, 0.8, overlay, 0.2, 0)
+
+            # Place the combined overlay back on the original frame
+            frame[y:y+h, x:x+w] = combined
+
+        # Display the resulting frame
+        cv2.imshow('Shape Detection and Component Matching', frame)
+
+        # Press 's' to save the current frame with overlay
+        if cv2.waitKey(1) & 0xFF == ord('s'):
+            output_file = os.path.join(script_dir, 'matched_components.png')
+            save_overlay_image(frame, overlay, output_file)
+            print(f"Saved matched components to {output_file}")
+
+        # Press 'q' to quit the webcam window
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
+    # Release the capture when everything is done
     cap.release()
     cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
-    gerber_directory = os.path.join(os.path.dirname(__file__), 'PP3_FPGA_Tester', 'CAMOutputs', 'GerberFiles')
-    gerber_files = [
-        os.path.join(gerber_directory, 'copper_top.gbr'),
-        os.path.join(gerber_directory, 'soldermask_top.gbr'),
-        os.path.join(gerber_directory, 'silkscreen_top.gbr'),
-        os.path.join(gerber_directory, 'profile.gbr')
-    ]
-
-    missing_files = [file for file in gerber_files if not os.path.exists(file)]
-    if missing_files:
-        raise FileNotFoundError(f"One or more Gerber files were not found: {missing_files}")
-
-    traces, pads, holes, outlines, pcb_profile = detect_top_layer_elements(gerber_files)
-    filtered_holes = [hole for hole in holes if hole.diameter > 0.4]
-    output_file = 'top_layer_image.png'
-    generate_vibrant_top_layer_image(outlines, pads, filtered_holes, pcb_profile, output_file=output_file)
-    show_overlay_with_webcam(output_file)
+    main()
