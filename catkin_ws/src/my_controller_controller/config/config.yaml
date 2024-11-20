@@ -1,0 +1,3 @@
+my_controller:
+  type: "my_controller_controller/MyController"
+  joint_name: "joint_1"

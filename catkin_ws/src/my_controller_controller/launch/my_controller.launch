@@ -1,0 +1,14 @@
+<launch>
+  <!-- Load the robot description -->
+  <param name="robot_description" command="$(find xacro)/xacro $(find your_robot_description)/urdf/your_robot.urdf.xacro" />
+
+  <!-- Load controller configurations from the YAML file -->
+  <rosparam file="$(find my_controller_controller)/config/config.yaml" command="load" />
+
+  <!-- Spawn the controller using the controller manager -->
+  <node name="controller_spawner" pkg="controller_manager" type="spawner" args="my_controller" output="screen" />
+
+  <!-- Publish robot states -->
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+</launch>
+

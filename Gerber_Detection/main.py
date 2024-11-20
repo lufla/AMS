@@ -168,9 +168,6 @@ def show_overlay_with_webcam(overlay_image_path, calibration_data=None):
     cv2.destroyAllWindows()
 
 
-# Optional: Provide calibration data if available
-# calibration_data = {'camera_matrix': camera_matrix, 'dist_coeffs': dist_coeffs}
-
 if __name__ == "__main__":
     gerber_directory = os.path.join(os.path.dirname(__file__), 'PP3_FPGA_Tester', 'CAMOutputs', 'GerberFiles')
     gerber_files = [
