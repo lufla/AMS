@@ -1,45 +1,17 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(my_controller_controller)
+project(testcont)
 
-## Specify dependencies
+## Compile as C++11, supported in ROS Kinetic and newer
+# add_compile_options(-std=c++11)
+
+## Find catkin macros and libraries
+## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
+## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  controller_interface
-  hardware_interface
-  pluginlib
   roscpp
+  rospy
+  std_msgs
 )
-
-## Declare a catkin package
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES my_controller_controller
-  CATKIN_DEPENDS controller_interface hardware_interface pluginlib roscpp
-)
-
-## Specify include directories
-include_directories(
-  SYSTEM
-  ${catkin_INCLUDE_DIRS}
-)
-
-## Build the controller library
-add_library(my_controller_controller src/my_controller.cpp)
-target_link_libraries(my_controller_controller ${catkin_LIBRARIES})
-
-## Install library
-install(TARGETS my_controller_controller
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-)
-
-## Install plugin description file
-install(FILES plugin_description.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
-
-target_compile_options(my_controller_controller PRIVATE
-  -Wno-shadow -Wno-unused-parameter
-)
-
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -98,7 +70,7 @@ target_compile_options(my_controller_controller PRIVATE
 ## Generate added messages and services with any dependencies listed here
 # generate_messages(
 #   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
+#   std_msgs
 # )
 
 ################################################
@@ -132,8 +104,8 @@ target_compile_options(my_controller_controller PRIVATE
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES my_controller_controller
-#  CATKIN_DEPENDS controller_interface hardware_interface pluginlib roscpp
+#  LIBRARIES testcont
+#  CATKIN_DEPENDS roscpp rospy std_msgs
 #  DEPENDS system_lib
 )
 
@@ -150,7 +122,7 @@ include_directories(
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/my_controller_controller.cpp
+#   src/${PROJECT_NAME}/testcont.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -161,7 +133,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/my_controller_controller_node.cpp)
+# add_executable(${PROJECT_NAME}_node src/testcont_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -225,7 +197,7 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_my_controller_controller.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_testcont.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
