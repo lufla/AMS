@@ -1,0 +1,5 @@
+<library path="libmy_controller_pkg">
+
+	<class name="thk_ns/MyController" type="thk_ns::MyController" base_class_type="controller_interface::ControllerBase">
+	</class>
+</library>
