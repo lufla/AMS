@@ -4,17 +4,17 @@ import math
 import csv
 import pandas as pd
 
-gerber = cv.imread("./images/top_layer_image.png", cv.IMREAD_UNCHANGED)
+gerber = cv.imread("PCB_Detection_2/images/top_layer_image.png", cv.IMREAD_UNCHANGED)
 gerber = cv.flip(gerber, 0)
 gerber = cv.resize(gerber, (0,0), fx=0.05, fy=0.05, interpolation=cv.INTER_LINEAR)
 print("gerber.shape: ", gerber.shape)
 
-reference = cv.imread("./images/PP3_FPGA_Tester_Scan.png", cv.IMREAD_COLOR)
+reference = cv.imread("PCB_Detection_2/images/PP3_FPGA_Tester_Scan.png", cv.IMREAD_COLOR)
 #reference = cv.resize(reference, (720, 480), interpolation=cv.INTER_LINEAR)
 reference = cv.resize(reference, (0,0), fx=0.25, fy=0.25, interpolation=cv.INTER_LINEAR)
 print("reference.shape: ", reference.shape)
 
-pnp_df = pd.read_csv("./PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
+pnp_df = pd.read_csv("PCB_Detection_2/PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
     header=None, sep="\t", index_col=False, usecols=[0,1,2,3])
 # 5:3, 160, 96, 160*90=14400
 #pnp_df[1] = pnp_df[1] / 160
@@ -23,6 +23,13 @@ pnp_df[1] = pnp_df[1] * 90 * 0.05 / gerber.shape[1]
 pnp_df[2] = pnp_df[2] * 90 * 0.05 / gerber.shape[0]
 pnp_df[2] = 1 - pnp_df[2] # flip
 print(pnp_df)
+
+# IC1 coordinates
+ic1_center_pixel = (
+    int(pnp_df.iloc[25][1] * reference.shape[1]),
+    int(pnp_df.iloc[25][2] * reference.shape[0])
+)
+cutout_radius = 50
 
 
 cap = cv.VideoCapture(0)
@@ -42,6 +49,7 @@ while True:
 
     # Capture frame-by-frame
     ret, frame = cap.read()
+    frame_copy = frame.copy()
  
     # if frame is read correctly ret is True
     if not ret:
@@ -125,6 +133,36 @@ while True:
     
     M = cv.getPerspectiveTransform(pts1,pts2)
     perspective = cv.warpPerspective(frame,M,(gerber.shape[1], gerber.shape[0]))
+    perspective_clean = cv.warpPerspective(frame_copy,M,(gerber.shape[1], gerber.shape[0]))
+
+    # get ic cutout
+    cutout_x_min = max(ic1_center_pixel[0] - cutout_radius, 0)
+    cutout_x_max = min(ic1_center_pixel[0] + cutout_radius, reference.shape[1] - 1)
+    cutout_y_min = max(ic1_center_pixel[1] - cutout_radius, 0)
+    cutout_y_max = min(ic1_center_pixel[1] + cutout_radius, reference.shape[0] - 1)
+    ic_cutout_center_pixel = (ic1_center_pixel[0] - cutout_x_min, ic1_center_pixel[1] - cutout_y_min)
+    
+    reference_cutout = reference[cutout_y_min:cutout_y_max, cutout_x_min:cutout_x_max]
+    reference_cutout_canny = cv.Canny(reference_cutout,100,200)
+    reference_cutout_gray = cv.cvtColor(reference_cutout, cv.COLOR_BGR2GRAY)
+
+    input_cutout = frame_copy[:, :] # placeholder for gripper cam
+    input_cutout_canny = cv.Canny(input_cutout,100,200)
+    input_cutout_gray = cv.cvtColor(input_cutout, cv.COLOR_BGR2GRAY)
+
+    # Apply template Matching
+    method = cv.TM_CCOEFF_NORMED
+    res = cv.matchTemplate(input_cutout_gray, reference_cutout_gray, method)
+    # NORMED method works better for different lighting
+    min_val, max_val, min_loc, max_loc = cv.minMaxLoc(res)
+    # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
+    if method in [cv.TM_SQDIFF, cv.TM_SQDIFF_NORMED]:
+        top_left = min_loc
+    else:
+        top_left = max_loc
+    bottom_right = (top_left[0] + reference_cutout.shape[1], top_left[1] + reference_cutout.shape[0])
+    cv.rectangle(input_cutout,top_left, bottom_right, 255, 2)
+    # TODO average cutout position
 
 
     """
@@ -177,7 +215,8 @@ while True:
         perspective[:, :, c] = (overlay_alpha * gerber[:, :, c] +
                             (1 - overlay_alpha) * perspective[:, :, c])
     
-    
+    # TODO transform from input shape to gerber shape?
+
     for i in range(0, pnp_df.shape[0]):
         pos = np.matmul(M_inv, [pnp_df.iloc[i][1]*gerber.shape[1], pnp_df.iloc[i][2]*gerber.shape[0], 1])[:2]
         cv.circle(frame, (int(pos[0]), int(pos[1])), 0, (255,255,127), 4)
@@ -188,6 +227,8 @@ while True:
     cv.imshow('thresh', thresh)
     cv.imshow('perspective', perspective)
     cv.imshow('gerber', gerber)
+    cv.imshow('input_cutout', input_cutout)
+    cv.imshow('reference_cutout', reference_cutout)
     if cv.waitKey(1) == ord('q'):
         break
 
