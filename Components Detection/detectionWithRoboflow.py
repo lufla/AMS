@@ -1,54 +1,69 @@
-import cv2
-from ultralytics import YOLO
 from roboflow import Roboflow
+import os
+import cv2
+import numpy as np
+import tensorflow as tf
 
-# Step 1: Initialize Roboflow and YOLO
-rf = Roboflow(api_key="<rNI84nUh3sqtBj0Qb1Bs>") # or rf_ebfboIbgNfSAmrfr4RJ7QxhVNEG3
-project = rf.workspace().project("printed-circuit-board")
-dataset = project.version(4).download("yolov8")
-model = YOLO(dataset.model_path)
+# Initialize Roboflow and download dataset
+rf = Roboflow(api_key="rNI84nUh3sqtBj0Qb1Bs")
+project = rf.workspace("ali-khan-2aqjc").project("hand-safety")
+version = project.version(5)
+dataset = version.download("yolov5")
 
-# Step 2: Initialize Webcam
-cap = cv2.VideoCapture(0)  # Use 0 for default webcam, or replace with your camera index
+# Define dataset paths
+train_path = os.path.join(dataset.location, "train")
+valid_path = os.path.join(dataset.location, "valid")
 
-if not cap.isOpened():
-    print("Error: Unable to access webcam.")
-    exit()
+# Load images and labels
+def load_data(data_path):
+    images = []
+    labels = []
+    for label_file in os.listdir(data_path):
+        if label_file.endswith(".jpg") or label_file.endswith(".png"):
+            # Load image
+            img_path = os.path.join(data_path, label_file)
+            img = cv2.imread(img_path)
+            img = cv2.resize(img, (224, 224))  # Resize to 224x224
+            images.append(img)
 
-def process_frame(frame):
-    # Predict on the current frame
-    results = model.predict(source=frame, conf=0.5)
-    detections = []
-    for result in results[0].boxes:
-        x1, y1, x2, y2, conf, cls = result.xyxy
-        label = result.label
-        detections.append({"label": label, "bbox": (int(x1), int(y1), int(x2), int(y2))})
+            # Load corresponding label (binary classification: safety=1, no_safety=0)
+            label_path = os.path.splitext(img_path)[0] + ".txt"
+            if os.path.exists(label_path):
+                with open(label_path, "r") as file:
+                    label_data = file.readline().strip().split()
+                    label = int(label_data[0])  # Assume first value is the class
+                    labels.append(label)
+            else:
+                labels.append(0)  # Default label if no annotation found
+    return np.array(images), np.array(labels)
 
-    # Draw detections on the frame
-    for detection in detections:
-        x1, y1, x2, y2 = detection["bbox"]
-        label = detection["label"]
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+# Load train and validation datasets
+x_train, y_train = load_data(train_path)
+x_valid, y_valid = load_data(valid_path)
 
-    return frame, detections
+# Normalize image data
+x_train = x_train / 255.0
+x_valid = x_valid / 255.0
 
-# Step 3: Process Webcam Stream
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        print("Error: Unable to read frame from webcam.")
-        break
+# Define a simple CNN model
+model = tf.keras.Sequential([
+    tf.keras.layers.Conv2D(32, (3, 3), activation="relu", input_shape=(224, 224, 3)),
+    tf.keras.layers.MaxPooling2D(2, 2),
+    tf.keras.layers.Conv2D(64, (3, 3), activation="relu"),
+    tf.keras.layers.MaxPooling2D(2, 2),
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(128, activation="relu"),
+    tf.keras.layers.Dense(1, activation="sigmoid")  # Binary classification
+])
 
-    processed_frame, detections = process_frame(frame)
+# Compile the model
+model.compile(optimizer="adam",
+              loss="binary_crossentropy",
+              metrics=["accuracy"])
 
-    # Display the processed frame
-    cv2.imshow("Detection", processed_frame)
+# Train the model
+model.fit(x_train, y_train, epochs=10, validation_data=(x_valid, y_valid))
 
-    # Break on 'q' key press
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Release resources
-cap.release()
-cv2.destroyAllWindows()
+# Save the model
+model.save("hand_safety_model.h5")
+print("Model saved as 'hand_safety_model.h5'")
