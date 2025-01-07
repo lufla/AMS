@@ -218,7 +218,10 @@ while True:
     # TODO transform from input shape to gerber shape?
 
     for i in range(0, pnp_df.shape[0]):
-        pos = np.matmul(M_inv, [pnp_df.iloc[i][1]*gerber.shape[1], pnp_df.iloc[i][2]*gerber.shape[0], 1])[:2]
+        #pos = np.matmul(M_inv, [pnp_df.iloc[i][1]*gerber.shape[1], pnp_df.iloc[i][2]*gerber.shape[0], 1])
+        gerber_pos = np.float32(np.array([[[pnp_df.iloc[i][1]*gerber.shape[1], pnp_df.iloc[i][2]*gerber.shape[0]]]]))
+        pos = cv.perspectiveTransform(gerber_pos, M_inv)[0][0]
+        # TODO what does perspectiveTransform do different than matmul?
         cv.circle(frame, (int(pos[0]), int(pos[1])), 0, (255,255,127), 4)
 
     cv.imshow("reference", reference)
