@@ -3,18 +3,20 @@ import cv2 as cv
 import math
 import csv
 import pandas as pd
+import os
+#file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "PCB_Detection_2/images/top_layer_image.png")
+gerber = cv.imread("images/top_layer_image.png", cv.IMREAD_UNCHANGED)
 
-gerber = cv.imread("PCB_Detection_2/images/top_layer_image.png", cv.IMREAD_UNCHANGED)
 gerber = cv.flip(gerber, 0)
 gerber = cv.resize(gerber, (0,0), fx=0.05, fy=0.05, interpolation=cv.INTER_LINEAR)
 print("gerber.shape: ", gerber.shape)
 
-reference = cv.imread("PCB_Detection_2/images/PP3_FPGA_Tester_Scan.png", cv.IMREAD_COLOR)
+reference = cv.imread("images/PP3_FPGA_Tester_Scan.png", cv.IMREAD_COLOR)
 #reference = cv.resize(reference, (720, 480), interpolation=cv.INTER_LINEAR)
 reference = cv.resize(reference, (0,0), fx=0.25, fy=0.25, interpolation=cv.INTER_LINEAR)
 print("reference.shape: ", reference.shape)
 
-pnp_df = pd.read_csv("PCB_Detection_2/PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
+pnp_df = pd.read_csv("PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
     header=None, sep="\t", index_col=False, usecols=[0,1,2,3])
 # 5:3, 160, 96, 160*90=14400
 #pnp_df[1] = pnp_df[1] / 160
@@ -32,7 +34,7 @@ ic1_center_pixel = (
 cutout_radius = 50
 
 
-cap = cv.VideoCapture(0)
+cap = cv.VideoCapture(2)
 #cap.set(cv.CAP_PROP_FRAME_WIDTH, 720)
 #cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
 width = cap.get(cv.CAP_PROP_FRAME_WIDTH)
@@ -214,15 +216,21 @@ while True:
     for c in range(0, 3):
         perspective[:, :, c] = (overlay_alpha * gerber[:, :, c] +
                             (1 - overlay_alpha) * perspective[:, :, c])
-    
-    # TODO transform from input shape to gerber shape?
 
     for i in range(0, pnp_df.shape[0]):
-        #pos = np.matmul(M_inv, [pnp_df.iloc[i][1]*gerber.shape[1], pnp_df.iloc[i][2]*gerber.shape[0], 1])
-        gerber_pos = np.float32(np.array([[[pnp_df.iloc[i][1]*gerber.shape[1], pnp_df.iloc[i][2]*gerber.shape[0]]]]))
-        pos = cv.perspectiveTransform(gerber_pos, M_inv)[0][0]
-        # TODO what does perspectiveTransform do different than matmul?
+        pos = np.matmul(M_inv, [pnp_df.iloc[i][1]*gerber.shape[1], pnp_df.iloc[i][2]*gerber.shape[0], 1])
+        w = pos[2]
+        pos = pos[0:2] / w
+
         cv.circle(frame, (int(pos[0]), int(pos[1])), 0, (255,255,127), 4)
+        if i == 25:
+            print("M_inv: ", M_inv)
+
+    # Distanz
+    # Basis Distanz abstand vonkamera wenn ocb das ganze bid einnimmt
+    # multiplizieren mit wurzel? aus determinante vom scalingmatrix von m_inv?
+    # translationsteil bezieht sich schon auf screen space?
+    # projection vector auf winkel? 1 wert ist z wert?
 
     cv.imshow("reference", reference)
     cv.imshow('canny', canny)
