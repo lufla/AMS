@@ -8,7 +8,7 @@ def main():
     reader = easyocr.Reader(['en'], gpu=True)  # Set gpu=True if you have a compatible GPU
 
     # Initialize webcam (0 is usually the default camera)
-    cap = cv2.VideoCapture(2)
+    cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Error: Could not open webcam.")
         return

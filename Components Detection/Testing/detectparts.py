@@ -1,73 +1,48 @@
+import os
+from ultralytics import YOLO
 import cv2
-import numpy as np
-import pytesseract
 
+def run_webcam_inference(model_path):
+    """
+    Run inference using a trained YOLO model with webcam input.
 
-def detect_camera():
-    """Automatically detect and connect to the PC camera."""
-    cap = cv2.VideoCapture(0)  # Default camera
+    Args:
+        model_path (str): Path to the trained YOLO model (e.g., 'best.pt').
+    """
+    # Load the trained model
+    model = YOLO(model_path)
+
+    # Open a connection to the webcam
+    cap = cv2.VideoCapture(0)  # Use 0 for the default webcam
+
     if not cap.isOpened():
-        print("Camera not detected. Please check the connection.")
-        return None
-    return cap
-
-
-def preprocess_image(frame):
-    """Preprocess the captured frame for text and grid detection."""
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    edges = cv2.Canny(blurred, 50, 150)
-    return gray, edges
-
-
-def detect_grid_and_text(frame, edges):
-    """Detect grid and text in the captured frame."""
-    # Detect grid lines
-    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    for contour in contours:
-        approx = cv2.approxPolyDP(contour, 0.02 * cv2.arcLength(contour, True), True)
-        if len(approx) == 4:  # Detect squares (grid cells)
-            cv2.drawContours(frame, [approx], -1, (0, 255, 0), 2)
-
-    # Extract text using Tesseract
-    text = pytesseract.image_to_string(frame, config='--psm 6')
-    print("Detected Text:", text)
-
-    return frame
-
-
-def main():
-    # Detect camera
-    cap = detect_camera()
-    if not cap:
+        print("Error: Could not open webcam.")
         return
 
-    print("Press 'q' to quit the camera feed.")
+    print("Press 'q' to quit.")
 
     while True:
+        # Read a frame from the webcam
         ret, frame = cap.read()
+
         if not ret:
-            print("Failed to capture frame. Exiting...")
+            print("Error: Failed to capture image.")
             break
 
-        # Preprocess the captured frame
-        gray, edges = preprocess_image(frame)
+        # Run inference on the frame
+        results = model.predict(source=frame, show=True, conf=0.25)  # Display results in real-time
 
-        # Detect grid and text
-        result_frame = detect_grid_and_text(frame.copy(), edges)
-
-        # Display the results
-        cv2.imshow('Detected Grid and Text', result_frame)
-
-        # Press 'q' to exit the loop
+        # Check for 'q' key to exit
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    # Release the camera and close windows
+    # Release the webcam and close any OpenCV windows
     cap.release()
     cv2.destroyAllWindows()
 
-
 if __name__ == "__main__":
-    main()
+    # Define the path to your trained model
+    model_path = "best.pt"  # Replace with the correct path if needed
+
+    # Run webcam inference
+    run_webcam_inference(model_path)
