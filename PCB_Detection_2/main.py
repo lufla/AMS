@@ -280,6 +280,7 @@ while True:
     
     #print(obj_points)
     #print(imgpoints)
+    # TODO use solvePnP
     ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(obj_points, imgpoints, gray.shape[::-1], None, None)
     #print(rvecs)
     #print(tvecs)
