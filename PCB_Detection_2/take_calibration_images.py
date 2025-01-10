@@ -1,0 +1,32 @@
+import time
+import cv2 as cv
+from dotenv import dotenv_values
+
+config = dotenv_values(".env")
+
+cap = cv.VideoCapture(int(config["camera_index"]))  # Change the index if you have multiple cameras
+
+#images = []
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        print("Failed to capture image. Exiting.")
+        break
+
+    #images.append(frame)
+    #print(len(images))
+
+    cv.imshow('frame', frame)
+
+    ms = int(time.time_ns() / 1_000_000)
+    #print(ms)
+    cv.imwrite(filename=f"calibration/{ms}.png", img=frame)
+
+    time.sleep(2)
+
+    # Break loop on 'q' key press
+    if cv.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cv.destroyAllWindows()

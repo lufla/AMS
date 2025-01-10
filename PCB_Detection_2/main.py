@@ -4,6 +4,18 @@ import math
 import csv
 import pandas as pd
 import os
+from dotenv import dotenv_values
+
+config = dotenv_values(".env")
+
+K = np.float32([
+    [587.82849426,   0.        , 305.51152884],
+    [  0.        , 594.84387672, 230.64909656],
+    [  0.        ,   0.        ,   1.        ]
+])
+
+K_inv = np.linalg.inv(K)
+
 #file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "PCB_Detection_2/images/top_layer_image.png")
 gerber = cv.imread("images/top_layer_image.png", cv.IMREAD_UNCHANGED)
 
@@ -21,10 +33,13 @@ pnp_df = pd.read_csv("PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3
 # 5:3, 160, 96, 160*90=14400
 #pnp_df[1] = pnp_df[1] / 160
 #pnp_df[2] = pnp_df[2] / 96
+# 90 pixel/mm, 0.05 resize
 pnp_df[1] = pnp_df[1] * 90 * 0.05 / gerber.shape[1]
 pnp_df[2] = pnp_df[2] * 90 * 0.05 / gerber.shape[0]
 pnp_df[2] = 1 - pnp_df[2] # flip
 print(pnp_df)
+
+gerber_size_mm = np.array(gerber.shape) / 0.05 / 90
 
 # IC1 coordinates
 ic1_center_pixel = (
@@ -34,7 +49,7 @@ ic1_center_pixel = (
 cutout_radius = 50
 
 
-cap = cv.VideoCapture(2)
+cap = cv.VideoCapture(int(config["camera_index"]))
 #cap.set(cv.CAP_PROP_FRAME_WIDTH, 720)
 #cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
 width = cap.get(cv.CAP_PROP_FRAME_WIDTH)
@@ -45,6 +60,7 @@ if not cap.isOpened():
     exit()
 
 moving_average_contour = np.float32([[[80,80],[640,80],[80,400],[640,400]]])
+tvecs_history = []
 
 while True:
     e1 = cv.getTickCount()
@@ -95,7 +111,7 @@ while True:
         area = cv.contourArea(contours[i])
         if area < 200:
             continue
-        if area > 720*480*0.7:
+        if area > frame.shape[0]*frame.shape[1]*0.9:
             continue
 
         contour_list.append(contours[i])
@@ -166,6 +182,12 @@ while True:
     cv.rectangle(input_cutout,top_left, bottom_right, 255, 2)
     # TODO average cutout position
 
+    #print("top_left: ", top_left)
+    #cv.circle(input_cutout, (int(top_left[0]), int(top_left[1])), 0, (255,255,255), 4)
+    #top_left_mm_at_100mm = np.matmul(K_inv, [top_left[0], top_left[1], 1]) * 100
+    #print("top_left_mm_at_100mm: ", top_left_mm_at_100mm)
+    # nach K_inv, ursprung in der mitte, x/[0] nach rechts, y/[1] nach unten
+
 
     """
     lines = cv.HoughLines(canny, 1, np.pi / 180, 150, None, 0, 0)
@@ -217,20 +239,57 @@ while True:
         perspective[:, :, c] = (overlay_alpha * gerber[:, :, c] +
                             (1 - overlay_alpha) * perspective[:, :, c])
 
+    pcb_points = []
+    camera_screen_points = []
+
     for i in range(0, pnp_df.shape[0]):
-        pos = np.matmul(M_inv, [pnp_df.iloc[i][1]*gerber.shape[1], pnp_df.iloc[i][2]*gerber.shape[0], 1])
-        w = pos[2]
-        pos = pos[0:2] / w
+        pos_pcb_screen = [pnp_df.iloc[i][1]*gerber.shape[1], pnp_df.iloc[i][2]*gerber.shape[0], 1]
+        pos_camera_screen = np.matmul(M_inv, pos_pcb_screen)
+        pos_camera_screen_norm = pos_camera_screen / pos_camera_screen[2]
 
-        cv.circle(frame, (int(pos[0]), int(pos[1])), 0, (255,255,127), 4)
+        #
+        pcb_points.append(np.array([pnp_df.iloc[i][1]*gerber_size_mm[1], pnp_df.iloc[i][2]*gerber_size_mm[0]]))
+        camera_screen_points.append(pos_camera_screen_norm)
+
+        cv.circle(frame, (int(pos_camera_screen_norm[0]), int(pos_camera_screen_norm[1])), 0, (255,255,127), 4)
+
+        cv.circle(frame, (int(pos_camera_screen[0]), int(pos_camera_screen[1])), 0, (255,0,255), 4)
+
         if i == 25:
-            print("M_inv: ", M_inv)
+            pos_3d = np.matmul(K_inv, pos_camera_screen_norm)
 
-    # Distanz
-    # Basis Distanz abstand vonkamera wenn ocb das ganze bid einnimmt
-    # multiplizieren mit wurzel? aus determinante vom scalingmatrix von m_inv?
-    # translationsteil bezieht sich schon auf screen space?
-    # projection vector auf winkel? 1 wert ist z wert?
+            #print(pos_3d)
+            #print(": ", M[2,:])
+
+        # test, funktioniert nur wenn kamera gerade über objekt ist
+        #distance_estimate = np.sqrt(np.linalg.det(M[0:2, 0:2]) * 0.8) * 140
+        #print("distance_estimate: ", distance_estimate)
+
+    # distance with camera calibration?
+
+    obj_points = [np.float32([[x[0], x[1], 0] for x in pcb_points[0:]])]
+    imgpoints = [np.float32([[x[0:2]] for x in camera_screen_points[0:]])]
+    
+    #obj_points = [np.float32([
+    #    [0, 0, 0],
+    #    [gerber_size_mm[1], 0, 0],
+    #    [0, gerber_size_mm[0], 0],
+    #    [gerber_size_mm[1], gerber_size_mm[0], 0],
+    #])]
+    #imgpoints = [np.float32([[moving_average_contour[0][0]], [moving_average_contour[0][1]], [moving_average_contour[0][2]], [moving_average_contour[0][3]]])]
+    
+    #print(obj_points)
+    #print(imgpoints)
+    ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(obj_points, imgpoints, gray.shape[::-1], None, None)
+    #print(rvecs)
+    #print(tvecs)
+    #print()
+    tvecs_history.append(np.reshape(tvecs, (3)))
+    if len(tvecs_history) > 60:
+        tvecs_history = tvecs_history[1:]
+    tvecs_average = np.average(tvecs, 0)
+    print(tvecs_average)
+    print()
 
     cv.imshow("reference", reference)
     cv.imshow('canny', canny)
@@ -252,9 +311,6 @@ cap.release()
 cv.destroyAllWindows()
 
 # add filters?
-# template matching
 # history average statt moving average?
 # remove outlier corner points?
 # canny dilate and fill?
-# cutout image at point
-# find cutout in (perspective transformed / gripper cam) image
