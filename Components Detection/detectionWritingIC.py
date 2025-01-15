@@ -82,11 +82,17 @@ def map_text_to_ic(frame, detected_ics, results):
 
 def process_frame_with_rotations(frame, reader, pattern):
     rotations = [0, 90, 180, 270]
-    windows = ["Original", "Rotated 90", "Rotated 180", "Rotated 270"]
+    windows = ["Rotated 0", "Rotated 90", "Rotated 180", "Rotated 270"]
     for i, angle in enumerate(rotations):
-        rotated_frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE if angle == 90 else
-                                   cv2.ROTATE_180 if angle == 180 else
-                                   cv2.ROTATE_90_COUNTERCLOCKWISE if angle == 270 else None)
+        if angle == 0:
+            rotated_frame = frame.copy()  # No rotation needed
+        else:
+            rotation_flag = (
+                cv2.ROTATE_90_CLOCKWISE if angle == 90 else
+                cv2.ROTATE_180 if angle == 180 else
+                cv2.ROTATE_90_COUNTERCLOCKWISE
+            )
+            rotated_frame = cv2.rotate(frame, rotation_flag)
 
         rotated_frame, detected_ics = detect_black_squares(rotated_frame)
         gray = cv2.cvtColor(rotated_frame, cv2.COLOR_BGR2GRAY)
