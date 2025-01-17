@@ -1,5 +1,8 @@
 import roslibpy
 
+# https://roslibpy.readthedocs.io/en/latest/examples.html
+# https://docs.pal-robotics.com/tiago-single/handbook.html
+
 client = roslibpy.Ros(host='tiago-158c', port=9090)
 
 ###

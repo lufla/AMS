@@ -1,3 +1,5 @@
+# https://docs.pal-robotics.com/tiago-single/handbook.html
+
 # run gripper camera driver (on tiago)
 ssh pal@tiago-158c
 rosrun tiago_bringup end_effector_camera.sh
