@@ -5,14 +5,14 @@ import csv
 import pandas as pd
 import os
 from dotenv import dotenv_values
+import json
 
 config = dotenv_values(".env")
 
-K = np.float32([
-    [587.82849426,   0.        , 305.51152884],
-    [  0.        , 594.84387672, 230.64909656],
-    [  0.        ,   0.        ,   1.        ]
-])
+with open(".env.json") as f:
+    config_json = json.load(f)
+
+K = np.float32(config_json["camera_matrix"])
 
 K_inv = np.linalg.inv(K)
 

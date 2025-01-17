@@ -1,0 +1,20 @@
+# run gripper camera driver (on tiago)
+ssh pal@tiago-158c
+rosrun tiago_bringup end_effector_camera.sh
+
+# check (on development)
+rostopic list | grep "end_effector"
+
+# show camera image (on development)
+rosrun image_view image_view image:=/end_effector/camera/image_raw \_image_transport:=compressed
+
+
+---
+
+# set development ntp server to ntp server hosted by tiago?
+# add to /etc/ntp.conf or /etc/systemd/timesyncd.conf
+server tiago-158c iburst
+# execute after
+systemctl restart systemd-timesyncd.service
+
+

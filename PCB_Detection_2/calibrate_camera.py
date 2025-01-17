@@ -3,6 +3,7 @@ import numpy as np
 import cv2 as cv
 import glob
 from dotenv import dotenv_values
+import json
 
 config = dotenv_values(".env")
 
@@ -50,6 +51,14 @@ for fname in images:
 
         ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
         print(mtx)
+
+    config_json = {}
+    config_json["camera_matrix"] = mtx.tolist()
+    print(config_json)
+
+    with open(".env.json", "w") as f:
+        json.dump(config_json, f)
+
 
 while True:
     if cv.waitKey(1) & 0xFF == ord('q'):
