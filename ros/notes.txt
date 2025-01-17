@@ -10,6 +10,8 @@ rostopic list | grep "end_effector"
 # show camera image (on development)
 rosrun image_view image_view image:=/end_effector/camera/image_raw \_image_transport:=compressed
 
+# start gazebo
+roslaunch tiago_158c_gazebo tiago_gazebo.launch
 
 ---
 
