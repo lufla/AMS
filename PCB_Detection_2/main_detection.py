@@ -3,6 +3,7 @@ import os
 import re
 import math
 import csv
+import time
 import cv2
 import cv2 as cv
 import numpy as np
@@ -443,6 +444,8 @@ def main_fused():
     client = initialize_ros_connection()
     initialize_tiago_head_camera(client)
     initialize_tiago_gripper_camera(client)
+
+    time.sleep(10)
 
     # For perspective tracking
     moving_average_contour = np.float32([[[80,80], [640,80], [80,400], [640,400]]])
