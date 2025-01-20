@@ -7,6 +7,12 @@ import json
 
 config = dotenv_values(".env")
 
+CAMERA_WEBCAM = 1
+CAMERA_HEAD = 2
+CAMERA_GRIPPER = 3
+
+CAMERA = CAMERA_HEAD
+
 # https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html
 
 # termination criteria
@@ -23,7 +29,15 @@ objp[:, :2] = np.mgrid[0:pattern_size[0], 0:pattern_size[1]].T.reshape(-1, 2)
 objpoints = []  # 3d point in real world space
 imgpoints = []  # 2d points in image plane.
 
-images = glob.glob('calibration/*.png')
+if CAMERA == CAMERA_WEBCAM: camera_dir = "webcam"
+if CAMERA == CAMERA_HEAD: camera_dir = "tiago/head"
+if CAMERA == CAMERA_GRIPPER: camera_dir = "tiago/gripper"
+
+if CAMERA == CAMERA_WEBCAM: file_extension = "png"
+if CAMERA == CAMERA_HEAD: file_extension = "jpg"
+if CAMERA == CAMERA_GRIPPER: file_extension = "jpg"
+
+images = glob.glob(f"PCB_Detection_2/calibration/{camera_dir}/*.{file_extension}")
 
 for fname in images:
     img = cv.imread(fname)
@@ -52,12 +66,18 @@ for fname in images:
         ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
         print(mtx)
 
-    config_json = {}
-    config_json["camera_matrix"] = mtx.tolist()
+
+    with open(".env.json", "r") as f:
+        config_json = json.load(f)
+
+    if CAMERA == CAMERA_WEBCAM: config_json["camera_matrix"] = mtx.tolist()
+    if CAMERA == CAMERA_HEAD: config_json["camera_head_matrix"] = mtx.tolist()
+    if CAMERA == CAMERA_GRIPPER: config_json["camera_gripper_matrix"] = mtx.tolist()
+
     print(config_json)
 
     with open(".env.json", "w") as f:
-        json.dump(config_json, f)
+        json.dump(config_json, f, indent=2)
 
 
 while True:

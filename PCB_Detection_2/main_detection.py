@@ -1,3 +1,4 @@
+import base64
 import os
 import re
 import math
@@ -8,6 +9,7 @@ import numpy as np
 import pandas as pd
 import easyocr
 from dotenv import load_dotenv, dotenv_values
+import roslibpy
 
 load_dotenv()  # Load env variables (confidenceThreshold, etc.)
 
@@ -21,6 +23,9 @@ else:
         print("Invalid confidenceThreshold. Using default 0.95.")
         confidence_threshold = 0.95
 print(f"Confidence Threshold: {confidence_threshold}")
+
+tiago_image_head_cache = {}
+tiago_image_gripper_cache = {}
 
 def calculate_confidence(contour, mask, frame):
     confidence = 1
@@ -223,6 +228,33 @@ def calculate_ic_center(pnp_df, reference_shape, index=25):
     cutout_radius = 50
     return ic_center_pixel, cutout_radius
 
+def decode_image_message(message):
+    base64_bytes = message['data'].encode('ascii')
+    image_bytes = base64.b64decode(base64_bytes)
+    jpg_as_np = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv.imdecode(jpg_as_np, cv.IMREAD_COLOR)
+    return image
+
+def initialize_ros_connection():
+    client = roslibpy.Ros(host=os.getenv("ros_host"), port=9090)
+    client.run()
+    return client
+
+def initialize_tiago_head_camera(client):
+    topic = roslibpy.Topic(client, '/xtion/rgb/image_raw/compressed', 'sensor_msgs/CompressedImage')
+    def set_head_cache(img):
+        global tiago_image_head_cache
+        tiago_image_head_cache = img
+    topic.subscribe(lambda message: set_head_cache(decode_image_message(message)))
+
+def initialize_tiago_gripper_camera(client):
+    topic = roslibpy.Topic(client, '/end_effector_camera/image_raw/compressed', 'sensor_msgs/CompressedImage')
+    def set_gripper_cache(img):
+        global tiago_image_gripper_cache
+        tiago_image_gripper_cache = img
+    topic.subscribe(lambda message: set_gripper_cache(decode_image_message(message)))
+
+
 def initialize_camera(camera_index=0, width=None, height=None):
     cap = cv.VideoCapture(camera_index)
     if not cap.isOpened():
@@ -406,8 +438,11 @@ def main_fused():
 
     ic_center_pixel, cutout_radius = calculate_ic_center(pnp_df, reference.shape)
 
-    cap, width, height = initialize_camera(camera_index)
-    print(f"Camera opened with width={width}, height={height}")
+    #cap, width, height = initialize_camera(camera_index)
+    #print(f"Camera opened with width={width}, height={height}")
+    client = initialize_ros_connection()
+    initialize_tiago_head_camera(client)
+    initialize_tiago_gripper_camera(client)
 
     # For perspective tracking
     moving_average_contour = np.float32([[[80,80], [640,80], [80,400], [640,400]]])
@@ -419,7 +454,9 @@ def main_fused():
         e1 = cv.getTickCount()
 
         # Grab frame
-        ret, frame = cap.read()
+        #ret, frame = cap.read()
+        ret = True
+        frame = tiago_image_gripper_cache
         if not ret:
             print("Failed to read frame. Exiting.")
             break
@@ -511,7 +548,7 @@ def main_fused():
         elapsed_time = (e2 - e1) / cv.getTickFrequency()
         print(f"Processing Time: {elapsed_time:.6f}s", end="\r", flush=True)
 
-    cap.release()
+    #cap.release()
     cv.destroyAllWindows()
 
 if __name__ == "__main__":

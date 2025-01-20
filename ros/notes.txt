@@ -14,7 +14,7 @@ rosrun image_view image_view image:=/end_effector/camera/image_raw \_image_trans
 source /opt/pal/gallium/setup.bash
 roslaunch tiago_158c_gazebo tiago_gazebo.launch
 
-# setup development 
+# setup development
 addLocalDns -u development -i $(hostname -I)
 
 ---

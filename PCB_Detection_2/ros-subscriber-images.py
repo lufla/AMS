@@ -6,6 +6,7 @@ import cv2 as cv
 import roslibpy.comm
 from cv_bridge import CvBridge
 from sensor_msgs.msg import CompressedImage, Image
+import numpy as np
 
 # http://wiki.ros.org/cv_bridge/Tutorials/ConvertingBetweenROSImagesAndOpenCVImagesPython
 
@@ -17,15 +18,27 @@ client.run()
 
 bridge = CvBridge()
 
-#listener = roslibpy.Topic(client, '/xtion/rgb/image_raw/compressed', 'sensor_msgs/CompressedImage')
-#listener = roslibpy.Topic(client, '/end_effector_camera/image_raw/compressed', 'sensor_msgs/CompressedImage')
-listener = roslibpy.Topic(client, '/xtion/depth_registered/image/compressed', 'sensor_msgs/CompressedImage')
+HEAD = 2
+GRIPPER = 3
 
-#listener.subscribe(lambda message: print(filter_message_info(message)))
-#listener.subscribe(lambda message: print(message["data"]))
-listener.subscribe(lambda message: display_image_msg(message))
+CAMERA = GRIPPER
+
+SAVE_IMAGES = False
+
+if CAMERA == HEAD:
+    listener = roslibpy.Topic(client, '/xtion/rgb/image_raw/compressed', 'sensor_msgs/CompressedImage')
+if CAMERA == GRIPPER: 
+    listener = roslibpy.Topic(client, '/end_effector_camera/image_raw/compressed', 'sensor_msgs/CompressedImage')
+
+next_frame_time = time.time_ns()
 
 def display_image_msg(message):
+    global next_frame_time
+    if time.time_ns() < next_frame_time:
+        return
+    else:
+        next_frame_time += 2 * 1E9
+    
     image_value = CompressedImage()
     image_value.header.seq = message['header']['seq']
     image_value.header.stamp.secs = message['header']['stamp']['secs']
@@ -42,14 +55,21 @@ def display_image_msg(message):
     image_bytes = base64.b64decode(base64_bytes)
     image_value.data = image_bytes
 
-
-    with open("image.jpg" , 'wb') as image_file:
-        image_file.write(image_bytes)
-    image_cv = cv.imread("image.jpg")
+    jpg_as_np = np.frombuffer(image_bytes, dtype=np.uint8)
+    image_cv = cv.imdecode(jpg_as_np, cv.IMREAD_COLOR)
+    
+    
+    ms = int(time.time_ns() / 1_000_000)
+    if CAMERA == HEAD: camera_dir = "head"
+    if CAMERA == GRIPPER: camera_dir = "gripper"
+    filename = f"PCB_Detection_2/calibration/tiago/{camera_dir}/{ms}.jpg"
+    
+    if SAVE_IMAGES: cv.imwrite(filename=filename, img=image_cv)
 
     #image_cv = bridge.imgmsg_to_cv2(image_value, desired_encoding='passthrough')
 
     cv.imshow("image", image_cv)
+
     if cv.waitKey(1) == ord('q'):
         return
 
@@ -60,6 +80,11 @@ def filter_message_info(message):
             continue
         result[k] = v
     return result
+
+
+#listener.subscribe(lambda message: print(filter_message_info(message)))
+#listener.subscribe(lambda message: print(message["data"]))
+listener.subscribe(display_image_msg)
 
 try:
     while True:
