@@ -11,7 +11,11 @@ rostopic list | grep "end_effector"
 rosrun image_view image_view image:=/end_effector/camera/image_raw \_image_transport:=compressed
 
 # start gazebo
+source /opt/pal/gallium/setup.bash
 roslaunch tiago_158c_gazebo tiago_gazebo.launch
+
+# setup development 
+addLocalDns -u development -i $(hostname -I)
 
 ---
 

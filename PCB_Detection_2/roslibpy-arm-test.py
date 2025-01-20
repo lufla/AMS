@@ -1,4 +1,5 @@
 import roslibpy
+from ..ros._THK_AMS_msg1 import THK_AMS_msg1
 
 # https://docs.pal-robotics.com/tiago-single/handbook.html#jointcommander-plugin-configuration
 # https://docs.pal-robotics.com/tiago-single/handbook.html#arm-control-ros-api
@@ -10,9 +11,16 @@ config = dotenv_values(".env")
 client = roslibpy.Ros(host=config["ros_host"], port=9090)
 client.run()
 
-listener = roslibpy.Topic(client, '/arm_controller/state', 'std_msgs/String')
-listener.subscribe(lambda message: print(message))
+topic = roslibpy.Topic(client, '/thk_ns/thk_tiago_xya', 'std_msgs/String')
 
+message = THK_AMS_msg1()
+message.x = 0
+message.y = 0
+message.angle = 0
+
+topic.publish(message)
+
+"""
 topics = client.get_topics()
 topics.sort()
 for topic in topics:
@@ -24,3 +32,4 @@ try:
         pass
 except KeyboardInterrupt:
     client.terminate()
+"""
