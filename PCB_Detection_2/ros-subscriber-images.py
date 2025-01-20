@@ -19,7 +19,7 @@ bridge = CvBridge()
 
 #listener = roslibpy.Topic(client, '/xtion/rgb/image_raw/compressed', 'sensor_msgs/CompressedImage')
 #listener = roslibpy.Topic(client, '/end_effector_camera/image_raw/compressed', 'sensor_msgs/CompressedImage')
-listener = roslibpy.Topic(client, '/xtion/depth_registered/image_raw/compressed', 'sensor_msgs/CompressedImage')
+listener = roslibpy.Topic(client, '/xtion/depth_registered/image/compressed', 'sensor_msgs/CompressedImage')
 
 #listener.subscribe(lambda message: print(filter_message_info(message)))
 #listener.subscribe(lambda message: print(message["data"]))
@@ -36,12 +36,11 @@ def display_image_msg(message):
     #image_value.encoding = message['encoding']
     #image_value.is_bigendian = message['is_bigendian']
     #image_value.step = message['step']
-    image_value.format = message['format']
+    #image_value.format = message['format']
 
     base64_bytes = message['data'].encode('ascii')
     image_bytes = base64.b64decode(base64_bytes)
     image_value.data = image_bytes
-    print("*")
 
 
     with open("image.jpg" , 'wb') as image_file:
