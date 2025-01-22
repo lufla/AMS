@@ -15,12 +15,19 @@ find_package(catkin REQUIRED COMPONENTS
   hardware_interface
   std_msgs
   control_msgs
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
+add_message_files(
+    DIRECTORY msg FILES
+    THK_AMS_msg1.msg
+)
 
+
+generate_messages(DEPENDENCIES std_msgs)
 
 ###################################
 ## catkin specific configuration ##
@@ -41,6 +48,7 @@ catkin_package(
     hardware_interface
     std_msgs
     control_msgs
+    message_runtime
 #  DEPENDS system_lib
 )
 
@@ -59,6 +67,7 @@ include_directories(
 add_library(${PROJECT_NAME}
   src/my_controller.cpp
 )
+#add_dependencies(lib lib_gencpp)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -69,6 +78,9 @@ add_library(${PROJECT_NAME}
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 ### add_executable(${PROJECT_NAME}_node src/my_controller.cpp)
+##add_executable(thk_init_pub src/thk_init_pub.cpp)
+add_executable(thk_arm_xya2 src/thk_arm_xya2.cpp)
+add_executable(thk_tiago2 src/thk_tiago2.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -78,12 +90,18 @@ add_library(${PROJECT_NAME}
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-###add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
+add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
+add_dependencies(thk_arm_xya2 my_controller_pkg_generate_messages_cpp)
+add_dependencies(thk_tiago2 my_controller_pkg_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
 )
+##target_link_libraries(thk_init_pub ${catkin_LIBRARIES})
+target_link_libraries(thk_arm_xya2 ${catkin_LIBRARIES})
+target_link_libraries(thk_tiago2 ${catkin_LIBRARIES})
+
 
 #############
 ## Install ##
@@ -122,7 +140,7 @@ install(TARGETS ${PROJECT_NAME}
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 install(FILES
-  thk_controller_plugins.xml
+  thk_controllers_plugins.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
