@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 import re
 import math
@@ -14,6 +15,10 @@ import roslibpy
 
 load_dotenv()  # Load env variables (confidenceThreshold, etc.)
 
+CAMERA_WEBCAM = 1
+CAMERA_HEAD = 2
+CAMERA_GRIPPER = 3
+
 confidence_threshold = os.getenv("confidenceThreshold")
 if confidence_threshold is None:
     confidence_threshold = 0.95
@@ -25,8 +30,8 @@ else:
         confidence_threshold = 0.95
 print(f"Confidence Threshold: {confidence_threshold}")
 
-tiago_image_head_cache = {}
-tiago_image_gripper_cache = {}
+tiago_image_head_cache = None
+tiago_image_gripper_cache = None
 
 def calculate_confidence(contour, mask, frame):
     confidence = 1
@@ -187,12 +192,15 @@ def process_frame_with_rotations_in_one_window(frame, reader, pattern):
 def load_config(env_path=".env"):
     return dotenv_values(env_path)
 
-def load_intrinsic_matrix():
-    K = np.float32([
-        [587.82849426,   0.,           305.51152884],
-        [0.,           594.84387672,  230.64909656],
-        [0.,             0.,             1.        ]
-    ])
+def load_intrinsic_matrix(CAMERA):
+
+    with open(".env.json") as f:
+        config_json = json.load(f)
+
+    if CAMERA == CAMERA_WEBCAM: K = np.float32(config_json["camera_matrix"])
+    if CAMERA == CAMERA_HEAD: K = np.float32(config_json["camera_head_matrix"])
+    if CAMERA == CAMERA_GRIPPER: K = np.float32(config_json["camera_gripper_matrix"])
+
     K_inv = np.linalg.inv(K)
     return K, K_inv
 
@@ -426,7 +434,9 @@ def main_fused():
     # (B) SETUP FOR PART 2 (CALIBRATION + OVERLAY)
     config = load_config()
     camera_index = int(config.get("camera_index", 0))
-    K, K_inv = load_intrinsic_matrix()
+    K, K_inv = load_intrinsic_matrix(CAMERA_WEBCAM)
+    K_head, K_head_inv = load_intrinsic_matrix(CAMERA_HEAD)
+    K_gripper, K_gripper_inv = load_intrinsic_matrix(CAMERA_GRIPPER)
 
     gerber = load_gerber_image("images/top_layer_image.png", scale_factor=0.05)
     reference = load_reference_image("images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25)
@@ -445,7 +455,8 @@ def main_fused():
     initialize_tiago_head_camera(client)
     initialize_tiago_gripper_camera(client)
 
-    time.sleep(10)
+    while(tiago_image_head_cache is None or tiago_image_gripper_cache is None):
+        pass
 
     # For perspective tracking
     moving_average_contour = np.float32([[[80,80], [640,80], [80,400], [640,400]]])
@@ -459,7 +470,9 @@ def main_fused():
         # Grab frame
         #ret, frame = cap.read()
         ret = True
+        #frame = tiago_image_head_cache
         frame = tiago_image_gripper_cache
+        
         if not ret:
             print("Failed to read frame. Exiting.")
             break
@@ -503,7 +516,7 @@ def main_fused():
 
         # 6) Draw PnP-based PCB points
         pcb_points, camera_screen_points = draw_pcb_points(
-            gerber, perspective, pnp_df, gerber_size_mm, M_inv, frame, K_inv
+            gerber, perspective, pnp_df, gerber_size_mm, M_inv, frame, K_gripper_inv
         )
 
         # 7) Overlay Gerber image onto the live camera
