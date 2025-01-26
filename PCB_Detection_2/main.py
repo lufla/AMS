@@ -316,3 +316,6 @@ cv.destroyAllWindows()
 # history average statt moving average?
 # remove outlier corner points?
 # canny dilate and fill?
+
+# TODO switch to gripper cam when template detection
+# threshold is reached

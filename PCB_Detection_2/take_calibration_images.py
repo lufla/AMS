@@ -21,7 +21,7 @@ while cap.isOpened():
 
     ms = int(time.time_ns() / 1_000_000)
     #print(ms)
-    cv.imwrite(filename=f"calibration/{ms}.png", img=frame)
+    cv.imwrite(filename=f"calibration/webcam/{ms}.png", img=frame)
 
     time.sleep(2)
 
