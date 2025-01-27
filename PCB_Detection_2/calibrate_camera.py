@@ -11,7 +11,7 @@ CAMERA_WEBCAM = 1
 CAMERA_HEAD = 2
 CAMERA_GRIPPER = 3
 
-CAMERA = CAMERA_HEAD
+CAMERA = CAMERA_WEBCAM
 
 # https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html
 

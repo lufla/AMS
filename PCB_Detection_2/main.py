@@ -17,18 +17,18 @@ K = np.float32(config_json["camera_matrix"])
 K_inv = np.linalg.inv(K)
 
 #file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "PCB_Detection_2/images/top_layer_image.png")
-gerber = cv.imread("images/top_layer_image.png", cv.IMREAD_UNCHANGED)
+gerber = cv.imread("PCB_Detection_2/images/top_layer_image.png", cv.IMREAD_UNCHANGED)
 
 gerber = cv.flip(gerber, 0)
 gerber = cv.resize(gerber, (0,0), fx=0.05, fy=0.05, interpolation=cv.INTER_LINEAR)
 print("gerber.shape: ", gerber.shape)
 
-reference = cv.imread("images/PP3_FPGA_Tester_Scan.png", cv.IMREAD_COLOR)
+reference = cv.imread("PCB_Detection_2/images/PP3_FPGA_Tester_Scan.png", cv.IMREAD_COLOR)
 #reference = cv.resize(reference, (720, 480), interpolation=cv.INTER_LINEAR)
 reference = cv.resize(reference, (0,0), fx=0.25, fy=0.25, interpolation=cv.INTER_LINEAR)
 print("reference.shape: ", reference.shape)
 
-pnp_df = pd.read_csv("PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
+pnp_df = pd.read_csv("PCB_Detection_2/PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
     header=None, sep="\t", index_col=False, usecols=[0,1,2,3])
 # 5:3, 160, 96, 160*90=14400
 #pnp_df[1] = pnp_df[1] / 160
@@ -180,13 +180,7 @@ while True:
         top_left = max_loc
     bottom_right = (top_left[0] + reference_cutout.shape[1], top_left[1] + reference_cutout.shape[0])
     cv.rectangle(input_cutout,top_left, bottom_right, 255, 2)
-    # TODO average cutout position
-
-    #print("top_left: ", top_left)
-    #cv.circle(input_cutout, (int(top_left[0]), int(top_left[1])), 0, (255,255,255), 4)
-    #top_left_mm_at_100mm = np.matmul(K_inv, [top_left[0], top_left[1], 1]) * 100
-    #print("top_left_mm_at_100mm: ", top_left_mm_at_100mm)
-    # nach K_inv, ursprung in der mitte, x/[0] nach rechts, y/[1] nach unten
+    # TODO average cutout position?
 
 
     """
@@ -257,6 +251,7 @@ while True:
 
         if i == 25:
             pos_3d = np.matmul(K_inv, pos_camera_screen_norm)
+            cv.circle(frame, np.int32(pos_camera_screen_norm[:2]), 4, (0,255,0), 4)
 
             #print(pos_3d)
             #print(": ", M[2,:])
@@ -265,10 +260,11 @@ while True:
         #distance_estimate = np.sqrt(np.linalg.det(M[0:2, 0:2]) * 0.8) * 140
         #print("distance_estimate: ", distance_estimate)
 
-    # distance with camera calibration?
-
     obj_points = [np.float32([[x[0], x[1], 0] for x in pcb_points[0:]])]
     imgpoints = [np.float32([[x[0:2]] for x in camera_screen_points[0:]])]
+
+    obj_points_pnp = np.float32([[x[0], x[1], 0] for x in pcb_points])
+    imgpoints_pnp = np.float32([x[0:2] for x in camera_screen_points])
     
     #obj_points = [np.float32([
     #    [0, 0, 0],
@@ -278,11 +274,10 @@ while True:
     #])]
     #imgpoints = [np.float32([[moving_average_contour[0][0]], [moving_average_contour[0][1]], [moving_average_contour[0][2]], [moving_average_contour[0][3]]])]
     
-    #print(obj_points)
-    #print(imgpoints)
-    # TODO use solvePnP
-    ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(obj_points, imgpoints, gray.shape[::-1], None, None)
-    ret, rvecs, tvecs = cv.solvePnP(obj_points, imgpoints, K)
+    #print(obj_points_pnp.shape)
+    #print(imgpoints_pnp.shape)
+    #ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(obj_points, imgpoints, gray.shape[::-1], None, None)
+    ret, rvecs, tvecs = cv.solvePnP(obj_points_pnp, imgpoints_pnp, K, None)
     #print(rvecs)
     #print(tvecs)
     #print()
@@ -290,8 +285,29 @@ while True:
     if len(tvecs_history) > 60:
         tvecs_history = tvecs_history[1:]
     tvecs_average = np.average(tvecs, 0)
-    print(tvecs_average)
-    print()
+    #print(tvecs_average)
+    #print()
+    ic1_position = np.float32([
+            pnp_df.iloc[25][1] * gerber.shape[1] / 0.05 / 90,
+            pnp_df.iloc[25][1] * gerber.shape[0] / 0.05 / 90,
+            0
+        ]).reshape(3,1)
+    rmat = cv.Rodrigues(rvecs)[0]
+    #print(rmat)
+    ic1_camera_point = (np.matmul(rmat, ic1_position) + tvecs).reshape(3)
+    print(ic1_camera_point)
+
+    axis = np.float32([[50,0,0], [0,50,0], [0,0,-50]]).reshape(-1,3)
+    axis_image, jac = cv.projectPoints(axis, rvecs, tvecs, K, None)
+    axis_image = np.int32(axis_image)
+    #print(axis_image)
+    corner = np.matmul(M_inv, [0, 0, 1])
+    corner = corner / corner[2]
+    corner = np.int32(corner[0:2])
+    #print(corner)
+    frame = cv.line(frame, corner, axis_image[0][0], (255,0,0), 5)
+    frame = cv.line(frame, corner, axis_image[1][0], (0,255,0), 5)
+    frame = cv.line(frame, corner, axis_image[2][0], (0,0,255), 5)
 
     cv.imshow("reference", reference)
     cv.imshow('canny', canny)
@@ -317,5 +333,5 @@ cv.destroyAllWindows()
 # remove outlier corner points?
 # canny dilate and fill?
 
-# TODO switch to gripper cam when template detection
-# threshold is reached
+# detect contour with green colour
+# TODO switch to gripper cam when template detection threshold is reached

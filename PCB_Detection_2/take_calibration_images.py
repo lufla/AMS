@@ -21,7 +21,10 @@ while cap.isOpened():
 
     ms = int(time.time_ns() / 1_000_000)
     #print(ms)
-    cv.imwrite(filename=f"calibration/webcam/{ms}.png", img=frame)
+    ret_write = cv.imwrite(filename=f"PCB_Detection_2/calibration/webcam/{ms}.png", img=frame)
+    if not ret_write:
+        print("Can not write image")
+        exit()
 
     time.sleep(2)
 
