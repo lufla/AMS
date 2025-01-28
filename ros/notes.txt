@@ -1,4 +1,6 @@
 # https://docs.pal-robotics.com/tiago-single/handbook.html
+# https://github.com/pal-robotics/tiago_robot/tree/humble-devel/tiago_description/meshes
+# https://github.com/pal-robotics/tiago_robot/tree/humble-devel/tiago_description/urdf
 
 # run gripper camera driver (on tiago)
 ssh pal@tiago-158c
