@@ -19,6 +19,8 @@ CAMERA_WEBCAM = 1
 CAMERA_HEAD = 2
 CAMERA_GRIPPER = 3
 
+USE_WEBCAM = True
+
 confidence_threshold = os.getenv("confidenceThreshold")
 if confidence_threshold is None:
     confidence_threshold = 0.95
@@ -204,7 +206,7 @@ def load_intrinsic_matrix(CAMERA):
     K_inv = np.linalg.inv(K)
     return K, K_inv
 
-def load_gerber_image(image_path="images/top_layer_image.png", scale_factor=0.05):
+def load_gerber_image(image_path="PCB_Detection_2/images/top_layer_image.png", scale_factor=0.05):
     gerber = cv.imread(image_path, cv.IMREAD_UNCHANGED)
     if gerber is None:
         raise FileNotFoundError(f"Gerber image not found at {image_path}")
@@ -212,7 +214,7 @@ def load_gerber_image(image_path="images/top_layer_image.png", scale_factor=0.05
     gerber = cv.resize(gerber, (0, 0), fx=scale_factor, fy=scale_factor, interpolation=cv.INTER_LINEAR)
     return gerber
 
-def load_reference_image(image_path="images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25):
+def load_reference_image(image_path="PCB_Detection_2/images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25):
     reference = cv.imread(image_path, cv.IMREAD_COLOR)
     if reference is None:
         raise FileNotFoundError(f"Reference image not found at {image_path}")
@@ -418,7 +420,6 @@ def draw_pcb_points(gerber, perspective, pnp_df, gerber_size_mm, M_inv, frame, K
 
     return pcb_points, camera_screen_points
 
-
 def setup(states):
     """
     A single main() that runs:
@@ -434,27 +435,41 @@ def setup(states):
     # (B) SETUP FOR PART 2 (CALIBRATION + OVERLAY)
     config = load_config()
     camera_index = int(config.get("camera_index", 0))
-    K, K_inv = load_intrinsic_matrix(CAMERA_WEBCAM)
-    K_head, K_head_inv = load_intrinsic_matrix(CAMERA_HEAD)
-    K_gripper, K_gripper_inv = load_intrinsic_matrix(CAMERA_GRIPPER)
+    if USE_WEBCAM:
+        states["K"], states["K_inv"] = load_intrinsic_matrix(CAMERA_WEBCAM)
+    else:
+        states["K_head"], states["K_head_inv"] = load_intrinsic_matrix(CAMERA_HEAD)
+        states["K_gripper"], states["K_gripper_inv"] = load_intrinsic_matrix(CAMERA_GRIPPER)
 
-    states["gerber"] = load_gerber_image("images/top_layer_image.png", scale_factor=0.05)
-    states["reference"] = load_reference_image("images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25)
+    states["gerber"] = load_gerber_image("PCB_Detection_2/images/top_layer_image.png", scale_factor=0.05)
+    states["reference"] = load_reference_image("PCB_Detection_2/images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25)
     states["gerber_size_mm"] = np.array(states["gerber"].shape) / 0.05 / 90
 
     states["pnp_df"] = load_pnp_data(
-        csv_path="PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
+        csv_path="PCB_Detection_2/PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
         gerber_shape=states["gerber"].shape
     )
 
-    #cap, width, height = initialize_camera(camera_index)
-    #print(f"Camera opened with width={width}, height={height}")
-    client = initialize_ros_connection()
-    initialize_tiago_head_camera(client)
-    initialize_tiago_gripper_camera(client)
+    if USE_WEBCAM:
+        cap, width, height = initialize_camera(camera_index)
+        print(f"Camera opened with width={width}, height={height}")
 
-    while(tiago_image_head_cache is None or tiago_image_gripper_cache is None):
-        pass
+        if not cap.isOpened():
+            print("Cannot open camera")
+            exit()
+        
+        states["cap"] = cap
+    else:
+        client = initialize_ros_connection()
+        initialize_tiago_head_camera(client)
+        initialize_tiago_gripper_camera(client)
+
+        while(tiago_image_head_cache is None or tiago_image_gripper_cache is None):
+            if tiago_image_head_cache is None:
+                print("Waiting for head camera images")
+            if tiago_image_gripper_cache is None:
+                print("Waiting for gripper camera images")
+            time.sleep(1)
 
 
 def printhello(states):
@@ -464,11 +479,25 @@ def detect_cutout(states, component_index):
     print("Press 'q' to quit.")
     while True:
         # Grab frame
-        frame = tiago_image_gripper_cache.copy()
+        if USE_WEBCAM:
+            ret, frame = states["cap"].read()
+ 
+            # if frame is read correctly ret is True
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                break
+            
+            K = states["K"]
+            K_inv = states["K_inv"]
+        else:
+            frame = tiago_image_gripper_cache.copy()
         
-        if frame is None:
-            print("Failed to read frame. Exiting.")
-            break
+            if frame is None:
+                print("Failed to read frame. Exiting.")
+                break
+            
+            K = states["K_gripper"]
+            K_inv = states["K_gripper_inv"]
 
         # 5) Template matching for a known IC
         ic_center_pixel, cutout_radius = calculate_ic_center(states["pnp_df"], states["reference"].shape, component_index)
@@ -486,11 +515,25 @@ def detect_component(states):
     print("Press 'q' to quit.")
     while True:
         # Grab frame
-        frame = tiago_image_gripper_cache.copy()
+        if USE_WEBCAM:
+            ret, frame = states["cap"].read()
+ 
+            # if frame is read correctly ret is True
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                break
+            
+            K = states["K"]
+            K_inv = states["K_inv"]
+        else:
+            frame = tiago_image_gripper_cache.copy()
         
-        if frame is None:
-            print("Failed to read frame. Exiting.")
-            break
+            if frame is None:
+                print("Failed to read frame. Exiting.")
+                break
+            
+            K = states["K_gripper"]
+            K_inv = states["K_gripper_inv"]
 
         # Show all four rotations in "All Rotations" window
         process_frame_with_rotations_in_one_window(frame, states["reader"], states["pattern"])
@@ -506,11 +549,27 @@ def detect_pcb(states):
         e1 = cv.getTickCount()
 
         # Grab frame
-        frame = tiago_image_head_cache.copy()
+        if USE_WEBCAM:
+            ret, frame = states["cap"].read()
+ 
+            # if frame is read correctly ret is True
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                break
+            
+            K = states["K"]
+            K_inv = states["K_inv"]
+        else:
+            frame = tiago_image_head_cache.copy()
         
-        if frame is None:
-            print("Failed to read frame. Exiting.")
-            break
+            if frame is None:
+                print("Failed to read frame. Exiting.")
+                break
+
+            K = states["K_head"]
+            K_inv = states["K_head_inv"]
+
+        frame_clean = frame.copy()
 
         # 1) Preprocessing
         gray, thresh, canny = preprocess_frame(frame)
@@ -530,13 +589,26 @@ def detect_pcb(states):
             M, M_inv, perspective, perspective_clean = compute_perspective_transform(
                 moving_average_contour, states["gerber"].shape, frame.shape, frame
             )
+
+            
+            if approx_filtered:
+                # find average PCB Color
+                mask = np.zeros(frame_clean.shape, np.uint8)
+                print(approx_list[0][0][0])
+                print(approx_list[1][0][0])
+                print(approx_list[2][0][0])
+                print(approx_list[3][0][0])
+                mask = cv.drawContours(mask, approx_filtered, -1, (255,255,255),1)
+                average_color = cv.mean(frame_clean, mask)
+                print("avg col: ", average_color)
+            
         except cv.error as e:
             print(f"Perspective transform error: {e}")
             continue
 
         # 6) Draw PnP-based PCB points
         pcb_points, camera_screen_points = draw_pcb_points(
-            states["gerber"], perspective, states["pnp_df"], states["gerber_size_mm"], M_inv, frame, states["K_gripper_inv"]
+            states["gerber"], perspective, states["pnp_df"], states["gerber_size_mm"], M_inv, frame, K_inv
         )
 
         # 7) Overlay Gerber image onto the live camera
@@ -551,8 +623,9 @@ def detect_pcb(states):
         obj_points_pnp = np.float32([[x[0], x[1], 0] for x in pcb_points])
         imgpoints_pnp = np.float32([x[0:2] for x in camera_screen_points])
 
-        ret, rvecs, tvecs = cv.solvePnP(obj_points_pnp, imgpoints_pnp, states["K_head"], None)
-        states["pcb_position"] = (rvecs, tvecs)
+        ret, rvecs, tvecs = cv.solvePnP(obj_points_pnp, imgpoints_pnp, K, None)
+        states["pcb_rvecs"] = rvecs
+        states["pcb_tvecs"] = tvecs
 
         pcb_corner = np.float32([0, 0, 0]).reshape(3,1)
 
@@ -562,7 +635,7 @@ def detect_pcb(states):
         print(pcb_corner_camera_point)
 
         axis = np.float32([[50,0,0], [0,50,0], [0,0,-50]]).reshape(-1,3)
-        axis_image, jac = cv.projectPoints(axis, rvecs, tvecs, states["K_head"], None)
+        axis_image, jac = cv.projectPoints(axis, rvecs, tvecs, K, None)
         axis_image = np.int32(axis_image)
         #print(axis_image)
         corner = np.matmul(M_inv, [0, 0, 1])
@@ -578,6 +651,7 @@ def detect_pcb(states):
         #cv.imshow("Canny", canny)
         #cv.imshow("Threshold", thresh)
         #cv.imshow("Perspective", perspective)
+        cv.imshow("Perspective Clean", perspective_clean)
         #cv.imshow("Gerber", states["gerber"])
         #cv.imshow("Gerber", states["gerber"])
 
@@ -595,10 +669,14 @@ def detect_pcb(states):
     #cap.release()
     cv.destroyAllWindows()
 
-def calculate_component_position(states, component_index):
+def calculate_component_pcb_position(states, component_index = 25):
     # check states
-    if states["pcb_position"] is None:
-        print("Error: \"pcb_position\" is None")
+    if states["pcb_rvecs"] is None:
+        print("Error: \"pcb_rvecs\" is None")
+        return
+    
+    if states["pcb_tvecs"] is None:
+        print("Error: \"pcb_tvecs\" is None")
         return
     
     ic_center_pixel, cutout_radius = calculate_ic_center(states["pnp_df"], states["reference"].shape, component_index)
@@ -608,14 +686,36 @@ def calculate_component_position(states, component_index):
         states["pnp_df"].iloc[25][1] * states["gerber"].shape[0] / 0.05 / 90,
         0
     ]).reshape(3,1)
+    rmat = cv.Rodrigues(states["pcb_rvecs"])[0]
+    ic1_camera_point = (np.matmul(rmat, ic1_position) + states["pcb_tvecs"]).reshape(3)
+    print(ic1_camera_point)
+    
+    # TODO Compensate for Head Offset and Rotation
 
 def set_component_index(states):
     component_index = input("Enter component_index:")
     states["component_index"] = component_index
-    print(f"Selected component {component_index}: {states["pnp_df"].iloc[component_index][0]}")
+    print(f"Selected component {component_index}: {states['pnp_df'].iloc[component_index][0]}")
+
+def move_arm_over_component(states):
+    config = load_config()
+    client = roslibpy.Ros(host=config["ros_host"], port=9090)
+    client.run()
+
+    topic = roslibpy.Topic(client, '/thk_ns/thk_tiago_xya', 'std_msgs/String')
+
+    topic.subscribe(lambda message: client.terminate())
+
+    topic.publish({"x": 0.4, "y": 0.4, "angle": math.pi/2})
+
+    time.sleep(1)
+
+    client.terminate()
 
 # State
 states = {
+    "K": None,
+    "K_inv": None,
     "K_head": None,
     "K_head_inv": None,
     "K_gripper": None,
@@ -627,18 +727,22 @@ states = {
     "pnp_df": None,
 
     "head_transform": None,
-    "pcb_position": None,
+    "pcb_rvecs": None,
+    "pcb_tvecs": None,
     "component_index": None,
     "component_position": None,
 }
 
 # Commands
 commands = {
-    "hello": printhello,
-    "detect_pcb": None,
-    "set_component_index": None,
-    "move_arm_over_component": None,
     "end": None,
+    "hello": printhello,
+    "detect_cutout": detect_cutout,
+    "detect_component": detect_component,
+    "detect_pcb": detect_pcb,
+    "calculate_component_pcb_position": calculate_component_pcb_position,
+    "set_component_index": set_component_index,
+    "move_arm_over_component": move_arm_over_component,
 }
 
 def main():
@@ -646,11 +750,18 @@ def main():
     setup(states)
 
     while True:
-        command = input("\nAvailable commands: \n\n" + "\n".join([x for x in commands.keys()]) + "\n\n")
+        command = input("\nAvailable commands: \n\n" + "\n".join([f"{i}: {s}" for i, s in enumerate(commands.keys())]) + "\n\n")
         print("\n*", command, "*\n")
-        if command == "end":
-            break
-        commands[command](states)
+        try:
+            command = int(command)
+        except:
+            pass
+        if command == "end" or command == 0:
+            return
+        if type(command) is str:
+            commands[command](states)
+        if type(command) is int:
+            list(commands.values())[command](states)
     
 
 if __name__ == "__main__":
