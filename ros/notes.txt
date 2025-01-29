@@ -17,6 +17,10 @@ rosrun image_view image_view image:=/end_effector/camera/image_raw \_image_trans
 source /opt/pal/gallium/setup.bash
 roslaunch tiago_158c_gazebo tiago_gazebo.launch
 
+# setup ROS Connection
+export ROS_MASTER_URI=http://tiago-158c:11311
+export ROS_IP=$(hostname -I)
+
 # setup development
 addLocalDns -u development -i $(hostname -I)
 
@@ -28,7 +32,13 @@ rosservice call /controller_manager/switch_controller "{start_controllers: [], s
 
 # start marks controller
 # from workspace directory
+# connect to ros / export env variables
 source devel/setup.bash
+# if not already built
+catkin_make
+# start xya controller
+rosrun my_controller_pkg thk_arm_xya2
+# init pub for start position
 rosrun my_controller_pkg thk_init_pub
 
 ---
@@ -114,3 +124,4 @@ Frame odom exists with parent map.
 
 # this works
 rostopic pub /head_controller/command trajectory_msgs/JointTrajectory '{"joint_names":  ["head_1_joint", "head_2_joint"],"points": [{"positions": [0.0, 0.3], "time_from_start": {"secs": 1}}]}'
+
