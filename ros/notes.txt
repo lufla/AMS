@@ -125,3 +125,7 @@ Frame odom exists with parent map.
 # this works
 rostopic pub /head_controller/command trajectory_msgs/JointTrajectory '{"joint_names":  ["head_1_joint", "head_2_joint"],"points": [{"positions": [0.0, 0.3], "time_from_start": {"secs": 1}}]}'
 
+# does not work
+rostopic pub /thk_ns/thk_tiago_xya2 std_msgs/String '{"x": 0.4, "y": 0.4, "angle": 1.5}'
+# does not give an error
+rostopic pub /thk_ns/thk_tiago_xya2 my_controller_pkg/THK_AMS_msg1 '{"x": 0.4, "y": 0.4, "angle": 1.5}'
