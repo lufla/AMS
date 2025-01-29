@@ -114,5 +114,3 @@ Frame odom exists with parent map.
 
 # this works
 rostopic pub /head_controller/command trajectory_msgs/JointTrajectory '{"joint_names":  ["head_1_joint", "head_2_joint"],"points": [{"positions": [0.0, 0.3], "time_from_start": {"secs": 1}}]}'
-
-test
