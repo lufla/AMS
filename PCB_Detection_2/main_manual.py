@@ -19,7 +19,7 @@ CAMERA_WEBCAM = 1
 CAMERA_HEAD = 2
 CAMERA_GRIPPER = 3
 
-USE_WEBCAM = True
+USE_WEBCAM = False
 
 confidence_threshold = os.getenv("confidenceThreshold")
 if confidence_threshold is None:
@@ -580,6 +580,18 @@ def detect_pcb(states):
         if approx_filtered:
             cv.drawContours(frame, approx_filtered, -1, (127, 127, 255), 4, cv.LINE_AA)
 
+            """
+            # find average PCB Color
+            mask = np.zeros(frame_clean.shape, np.uint8)
+            print(approx_filtered[0][0][0])
+            print(approx_filtered[1][0][0])
+            print(approx_filtered[2][0][0])
+            print(approx_filtered[3][0][0])
+            mask = cv.drawContours(mask, approx_filtered, -1, (255,255,255),1)
+            average_color = cv.mean(frame_clean, mask)
+            print("avg col: ", average_color)
+            """
+
         # 3) Update moving average contour
         if approx_filtered:
             moving_average_contour = update_moving_average_contour(moving_average_contour, approx_filtered[0])
@@ -590,17 +602,6 @@ def detect_pcb(states):
                 moving_average_contour, states["gerber"].shape, frame.shape, frame
             )
 
-            
-            if approx_filtered:
-                # find average PCB Color
-                mask = np.zeros(frame_clean.shape, np.uint8)
-                print(approx_list[0][0][0])
-                print(approx_list[1][0][0])
-                print(approx_list[2][0][0])
-                print(approx_list[3][0][0])
-                mask = cv.drawContours(mask, approx_filtered, -1, (255,255,255),1)
-                average_color = cv.mean(frame_clean, mask)
-                print("avg col: ", average_color)
             
         except cv.error as e:
             print(f"Perspective transform error: {e}")
