@@ -7,6 +7,7 @@ config = dotenv_values(".env")
 client = roslibpy.Ros(host=config["ros_host"], port=9090)
 client.run()
 
+#topic = roslibpy.Topic(client, '/thk_ns/thk_tiago_xya', 'my_controller_pkg/THK_AMS_msg1')
 topic = roslibpy.Topic(client, '/thk_ns/thk_tiago_xya', 'std_msgs/String')
 
 topic.subscribe(lambda message: client.terminate())
