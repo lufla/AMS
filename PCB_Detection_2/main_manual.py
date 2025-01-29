@@ -470,6 +470,8 @@ def setup(states):
             if tiago_image_gripper_cache is None:
                 print("Waiting for gripper camera images")
             time.sleep(1)
+    
+    # TODO init transform subscriber with cache
 
 
 def printhello(states):

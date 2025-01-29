@@ -13,9 +13,11 @@ topic = roslibpy.Topic(client, '/head_controller/command', 'std_msgs/String')
 
 topic.subscribe(lambda message: client.terminate())
 
+# head_1_joint pan left right, head_2_joint tilt up down
+
 topic.publish(
     {
-        "joint_names":  ["head_1_joint", "head_2_joint"], # 1 left right, 2 up down
+        "joint_names":  ["head_1_joint", "head_2_joint"],
         "points": [{"positions": [0.0, -0.85], "time_from_start": {"secs": 1}}]
     }
 )

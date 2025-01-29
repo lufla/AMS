@@ -4,6 +4,9 @@
 ssh pal@tiago-158c
 rosrun tiago_bringup end_effector_camera.sh
 
+# source pal
+source /opt/pal/gallium/setup.bash
+
 # check (on development)
 rostopic list | grep "end_effector"
 
@@ -20,8 +23,13 @@ addLocalDns -u development -i $(hostname -I)
 # stop autonomous head movement
 rosnode kill /pal_head_manager
 
-# stop default arm contller
+# stop arm controller
 rosservice call /controller_manager/switch_controller "{start_controllers: [], stop_controllers: [arm_controller], strictness: 2}"
+
+# start marks controller
+# from workspace directory
+source devel/setup.bash
+rosrun my_controller_pkg thk_init_pub
 
 ---
 
@@ -101,8 +109,7 @@ Frame head_1_link exists with parent torso_lift_link.
 Frame suspension_left_link exists with parent base_link.
 Frame suspension_right_link exists with parent base_link.
 Frame wheel_left_link exists with parent suspension_left_link.
-Frame wheel_right_link exists with parent suspensionrostopic pub /head_controller/command trajectory_msgs/JointTrajectory '{"joint_names":  ["head_1_joint", "head_2_joint"],"points": [{"positions": [0.0, 0.3], "time_from_start": {"secs": 1}}]}'
-right_link.
+Frame wheel_right_link exists with parent suspension_right_link.
 Frame odom exists with parent map.
 
 # this works
