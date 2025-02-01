@@ -22,7 +22,10 @@ export ROS_MASTER_URI=http://tiago-158c:11311
 export ROS_IP=$(hostname -I)
 
 # setup development
-addLocalDns -u development -i $(hostname -I)
+# execute on tiago
+addLocalDns -u development -i <development-ip>
+# or ?
+ssh pal@tiago-158c addLocalDns -u development -i $(hostname -I)
 
 # stop autonomous head movement
 rosnode kill /pal_head_manager
