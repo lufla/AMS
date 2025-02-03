@@ -23,7 +23,7 @@ export ROS_IP=$(hostname -I)
 
 # setup development
 # execute on tiago
-addLocalDns -u development -i <development-ip>
+sudo addLocalDns -u development -i <development-ip>
 # or from development
 ssh root@tiago-158c addLocalDns -u development -i $(hostname -I)
 
@@ -43,6 +43,8 @@ catkin_make
 rosrun my_controller_pkg thk_arm_xya2
 # init pub for start position
 rosrun my_controller_pkg thk_init_pub
+# optional test
+rosrun my_controller_pkg thk_tiago2
 
 # for any other random problems
 # try setting the time on tiago to the of the development pc
@@ -50,6 +52,7 @@ timezonectl set-timezone Europe/Berlin
 date --set="13:19 CET"
 # print time
 date
+
 
 
 ---
