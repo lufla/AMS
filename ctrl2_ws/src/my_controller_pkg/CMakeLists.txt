@@ -78,7 +78,7 @@ add_library(${PROJECT_NAME}
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 ### add_executable(${PROJECT_NAME}_node src/my_controller.cpp)
-##add_executable(thk_init_pub src/thk_init_pub.cpp)
+add_executable(thk_init_pub src/thk_init_pub.cpp)
 add_executable(thk_arm_xya2 src/thk_arm_xya2.cpp)
 add_executable(thk_tiago2 src/thk_tiago2.cpp)
 
@@ -98,7 +98,7 @@ add_dependencies(thk_tiago2 my_controller_pkg_generate_messages_cpp)
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
 )
-##target_link_libraries(thk_init_pub ${catkin_LIBRARIES})
+target_link_libraries(thk_init_pub ${catkin_LIBRARIES})
 target_link_libraries(thk_arm_xya2 ${catkin_LIBRARIES})
 target_link_libraries(thk_tiago2 ${catkin_LIBRARIES})
 

@@ -461,6 +461,7 @@ def setup(states):
         states["cap"] = cap
     else:
         client = initialize_ros_connection()
+        states["ros_client"] = client
         initialize_tiago_head_camera(client)
         initialize_tiago_gripper_camera(client)
 
@@ -699,6 +700,38 @@ def set_component_index(states):
     component_index = input("Enter component_index:")
     states["component_index"] = component_index
     print(f"Selected component {component_index}: {states['pnp_df'].iloc[component_index][0]}")
+
+def request_head_transform():
+    # TODO setup stream instead of lookup?
+    # TODO
+    states["ros_client"]
+    topic_result = roslibpy.Topic(states["ros_client"], '/tf_lookup/result', 'tf_lookup/TfLookupActionResult')
+
+    def check_tf_lookup_result(message, source_frame, target_frame):
+        if message["result"]["transform"]["header"]["frame_id"] != target_frame:
+            return None
+        if message["result"]["transform"]["child_frame_id"] != source_frame:
+            return None
+        
+        return message["result"]["transform"]["transform"]
+
+    topic_result.subscribe(lambda message: print(check_tf_lookup_result(message, "xtion_rgb_frame", "arm_1_link")))
+
+    time.sleep(1)
+
+    topic_goal = roslibpy.Topic(states["ros_client"], '/tf_lookup/goal', 'std_msgs/String')
+
+    topic_goal.publish(
+        {
+            "goal": {
+            "target_frame": "arm_1_link",
+            "source_frame": "xtion_rgb_frame",
+            "transform_time": 1
+            }
+        }
+    )
+    # TODO or refresh during pcb detection with cache
+
 
 def move_arm_over_component(states):
     config = load_config()

@@ -119,7 +119,11 @@ int main (int argc, char** argv) {
 				thk_init_pub1.publish(msg);
 				ros::spinOnce();
 				thk_ns::wait_ms(WAIT_LONG);*/
-				
+
+				thk_ns::wait_ms(WAIT_LONG);
+				thk_ns::wait_ms(WAIT_LONG);
+
+			
 				//arm.header.stamp = ros::Time::now();
 				thk_arm_pub.publish(arm);
 				ros::spinOnce();
@@ -128,7 +132,7 @@ int main (int argc, char** argv) {
 				thk_arm_pub.publish(arm);
 				ros::spinOnce();
 				thk_ns::wait_ms(WAIT_MID);
-				state = INIT_4;
+				state = INIT_2;
 				break;
 			case INIT_2:
 				msg.data = 0.00;

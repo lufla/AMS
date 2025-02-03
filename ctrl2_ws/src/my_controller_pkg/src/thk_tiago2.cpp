@@ -102,6 +102,9 @@ int main (int argc, char** argv) {
 	arm.points[0].positions[6] = JOINT7INIT;
 	
 	ros::Rate loop_rate(1);
+
+	thk_ns::wait_ms(WAIT_LONG);
+	thk_ns::wait_ms(WAIT_LONG);
 	
 	
 	/*  Simple state machine
