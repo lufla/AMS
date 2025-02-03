@@ -3,6 +3,8 @@
 # run gripper camera driver (on tiago)
 ssh pal@tiago-158c
 rosrun tiago_bringup end_effector_camera.sh
+# or in background
+rosrun tiago_bringup end_effector_camera.sh & disown
 
 # source pal
 source /opt/pal/gallium/setup.bash
@@ -53,6 +55,13 @@ date --set="13:19 CET"
 # print time
 date
 
+# try deploying ros package to tiago
+source devel/setup.bash
+rosrun pal_deploy deploy.py -p my_controller_pkg tiago-158c
+# handbook example for new package
+source /opt/pal/gallium/setup.bash
+alias deploy="rosrun pal_deploy deploy.py"
+deploy -p my_pkg tiago-0c
 
 
 ---
