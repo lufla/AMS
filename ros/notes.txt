@@ -49,9 +49,10 @@ rosrun my_controller_pkg thk_init_pub
 rosrun my_controller_pkg thk_tiago2
 
 # for any other random problems
-# try setting the time on tiago to the of the development pc
-timezonectl set-timezone Europe/Berlin
+# try setting the time on tiago to the time of the development pc
 date --set="13:19 CET"
+# optional
+timezonectl set-timezone Europe/Berlin
 # print time
 date
 
