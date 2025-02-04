@@ -19,13 +19,17 @@ Use Python 3.9
 
 #### Python Dependencies
 
+#### Deploy ROS Package
+
 ## Setup
 
 ### Tiago
 
+#### DNS Entry
+
 ### Development
 
-#### ROS Packages
+#### ROS Connection
 
 ## Usage
 

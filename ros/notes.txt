@@ -17,7 +17,7 @@ rosrun image_view image_view image:=/end_effector/camera/image_raw \_image_trans
 
 # start gazebo
 source /opt/pal/gallium/setup.bash
-roslaunch tiago_158c_gazebo tiago_gazebo.launch
+roslaunch tiago_158_gazebo tiago_gazebo.launch
 
 # setup ROS Connection
 export ROS_MASTER_URI=http://tiago-158c:11311
@@ -41,12 +41,15 @@ rosservice call /controller_manager/switch_controller "{start_controllers: [], s
 source devel/setup.bash
 # if not already built
 catkin_make
-# start xya controller
-rosrun my_controller_pkg thk_arm_xya2
 # init pub for start position
 rosrun my_controller_pkg thk_init_pub
+# start xya controller
+rosrun my_controller_pkg thk_arm_xya2
+
 # optional test
 rosrun my_controller_pkg thk_tiago2
+rosrun my_controller_pkg thk_accuracy
+rosrun my_controller_pkg thk_head
 
 # for any other random problems
 # try setting the time on tiago to the time of the development pc

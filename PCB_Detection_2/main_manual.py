@@ -12,6 +12,8 @@ import pandas as pd
 #import easyocr
 from dotenv import load_dotenv, dotenv_values
 import roslibpy
+import scipy
+import scipy.spatial
 
 load_dotenv()  # Load env variables (confidenceThreshold, etc.)
 
@@ -34,6 +36,7 @@ print(f"Confidence Threshold: {confidence_threshold}")
 
 tiago_image_head_cache = None
 tiago_image_gripper_cache = None
+tiago_head_arm_transform_cache = None
 
 def calculate_confidence(contour, mask, frame):
     confidence = 1
@@ -265,6 +268,52 @@ def initialize_tiago_gripper_camera(client):
         tiago_image_gripper_cache = img
     topic.subscribe(lambda message: set_gripper_cache(decode_image_message(message)))
 
+tf_stream_topic = None
+def initialize_head_arm_transform_stream(client):
+
+    topic_result = roslibpy.Topic(client, '/tf_stream/result', 'tf_lookup/TfStreamActionResult')
+
+    def check_tf_stream_result(message):
+        global tf_stream_topic
+        tf_stream_topic = message["result"]["topic"]
+
+    topic_result.subscribe(lambda message: check_tf_stream_result(message))
+
+    time.sleep(1)
+
+    topic_goal = roslibpy.Topic(client, '/tf_stream/goal', 'std_msgs/String')
+
+    topic_goal.publish(
+        {
+            "goal": {
+            "transforms": [
+                { "target": "arm_1_link", "source": "xtion_rgb_frame" }
+            ],
+            "subscription_id": "",
+            "update": False,
+            }
+        }
+    )
+
+    while tf_stream_topic is None:
+        print("Waiting for transform stream topic")
+        time.sleep(1)
+
+    topic_stream = roslibpy.Topic(client, tf_stream_topic, 'tf/tfMessage')
+
+    def set_head_arm_transform_cache(message):
+        global tiago_head_arm_transform_cache
+        translation = message["transforms"][0]["transform"]["translation"]
+        tvec = [translation["x"], translation["y"], translation["z"]]
+        rot_q = message["transforms"][0]["transform"]["rotation"]
+        rot_q_array = [rot_q["x"], rot_q["y"], rot_q["z"], rot_q["w"]]
+        rotation = scipy.spatial.transform.Rotation.from_quat(rot_q_array)
+        rmat = rotation.as_matrix()
+        tiago_head_arm_transform_cache = {"tvec": tvec, "rmat": rmat}
+
+
+
+    topic_stream.subscribe(lambda message: set_head_arm_transform_cache(message))
 
 def initialize_camera(camera_index=0, width=None, height=None):
     cap = cv.VideoCapture(camera_index)
@@ -293,7 +342,7 @@ def find_and_draw_contours(frame, thresh):
     contour_list, hull_list, approx_list = [], [], []
     for cnt in contours:
         area = cv.contourArea(cnt)
-        if 200 < area < frame.shape[0] * frame.shape[1] * 0.9:
+        if 200 < area < frame.shape[0] * frame.shape[1] * 0.2: # min and max contour area
             contour_list.append(cnt)
             hull = cv.convexHull(cnt)
             hull_list.append(hull)
@@ -461,18 +510,22 @@ def setup(states):
         states["cap"] = cap
     else:
         client = initialize_ros_connection()
-        states["ros_client"] = client
+        states["client"] = client
         initialize_tiago_head_camera(client)
         initialize_tiago_gripper_camera(client)
+        initialize_head_arm_transform_stream(client)
 
-        while(tiago_image_head_cache is None or tiago_image_gripper_cache is None):
+        while(
+            tiago_image_head_cache is None
+            or tiago_image_gripper_cache is None
+            or tiago_head_arm_transform_cache):
             if tiago_image_head_cache is None:
                 print("Waiting for head camera images")
             if tiago_image_gripper_cache is None:
                 print("Waiting for gripper camera images")
+            if tiago_head_arm_transform_cache is None:
+                print("Waiting for head arm transform")
             time.sleep(1)
-    
-    # TODO init transform subscriber with cache
 
 
 def printhello(states):
@@ -692,64 +745,54 @@ def calculate_component_pcb_position(states, component_index = 25):
     ]).reshape(3,1)
     rmat = cv.Rodrigues(states["pcb_rvecs"])[0]
     ic1_camera_point = (np.matmul(rmat, ic1_position) + states["pcb_tvecs"]).reshape(3)
-    print(ic1_camera_point)
+    states["component_position_camera"] = ic1_camera_point
+
+    ic1_camera_point_yzflip = np.float32([ic1_camera_point[0],ic1_camera_point[2], ic1_camera_point[1]])
+    states["component_position_arm"] = (
+        np.matmul(tiago_head_arm_transform_cache["rmat"], ic1_camera_point_yzflip/1000) + tiago_head_arm_transform_cache["tvec"]
+    ).reshape(3)
+    print("camera: ", states["component_position_camera"])
+    print("arm: ", states["component_position_arm"])
     
-    # TODO Compensate for Head Offset and Rotation
 
 def set_component_index(states):
     component_index = input("Enter component_index:")
     states["component_index"] = component_index
     print(f"Selected component {component_index}: {states['pnp_df'].iloc[component_index][0]}")
 
-def request_head_transform():
-    # TODO setup stream instead of lookup?
-    # TODO
-    states["ros_client"]
-    topic_result = roslibpy.Topic(states["ros_client"], '/tf_lookup/result', 'tf_lookup/TfLookupActionResult')
-
-    def check_tf_lookup_result(message, source_frame, target_frame):
-        if message["result"]["transform"]["header"]["frame_id"] != target_frame:
-            return None
-        if message["result"]["transform"]["child_frame_id"] != source_frame:
-            return None
-        
-        return message["result"]["transform"]["transform"]
-
-    topic_result.subscribe(lambda message: print(check_tf_lookup_result(message, "xtion_rgb_frame", "arm_1_link")))
-
-    time.sleep(1)
-
-    topic_goal = roslibpy.Topic(states["ros_client"], '/tf_lookup/goal', 'std_msgs/String')
-
-    topic_goal.publish(
-        {
-            "goal": {
-            "target_frame": "arm_1_link",
-            "source_frame": "xtion_rgb_frame",
-            "transform_time": 1
-            }
-        }
-    )
-    # TODO or refresh during pcb detection with cache
-
 
 def move_arm_over_component(states):
-    config = load_config()
-    client = roslibpy.Ros(host=config["ros_host"], port=9090)
-    client.run()
+    topic = roslibpy.Topic(states["client"], '/thk_ns/thk_tiago_xya', 'std_msgs/String')
 
-    topic = roslibpy.Topic(client, '/thk_ns/thk_tiago_xya', 'std_msgs/String')
+    target = {"x": states["component_position_arm"][1], "y": -states["component_position_arm"][0], "angle": math.pi/2}
+    print("move to: ", target)
 
-    topic.subscribe(lambda message: client.terminate())
+    topic.publish(target)
 
-    topic.publish({"x": 0.4, "y": 0.4, "angle": math.pi/2})
+def move_head(states):
+    topic = roslibpy.Topic(states["client"], '/head_controller/command', 'std_msgs/String')
 
-    time.sleep(1)
+    topic.publish(
+        {
+            "joint_names":  ["head_1_joint", "head_2_joint"],
+            "points": [{"positions": [0.0, -0.85], "time_from_start": {"secs": 1}}]
+        }
+    )
 
-    client.terminate()
+def reset_arm(states):
+    topic = roslibpy.Topic(states["client"], '/thk_ns/thk_tiago_xya', 'std_msgs/String')
+
+    topic.publish({"x": 0.1, "y": 0.95, "angle": math.pi/2})
+
+def show_head_transform(states):
+    print(tiago_head_arm_transform_cache)
+    print()
+
 
 # State
 states = {
+    "client": None,
+
     "K": None,
     "K_inv": None,
     "K_head": None,
@@ -762,16 +805,20 @@ states = {
     "reference": None,
     "pnp_df": None,
 
-    "head_transform": None,
     "pcb_rvecs": None,
     "pcb_tvecs": None,
     "component_index": None,
-    "component_position": None,
+    "component_position_camera": None,
+    "component_position_arm": None,
 }
+
+def end(states):
+    states["client"].terminate()
+    exit()
 
 # Commands
 commands = {
-    "end": None,
+    "end": end,
     "hello": printhello,
     "detect_cutout": detect_cutout,
     "detect_component": detect_component,
@@ -779,6 +826,9 @@ commands = {
     "calculate_component_pcb_position": calculate_component_pcb_position,
     "set_component_index": set_component_index,
     "move_arm_over_component": move_arm_over_component,
+    "move_head": move_head,
+    "reset_arm": reset_arm,
+    "show_head_transform": show_head_transform,
 }
 
 def main():
@@ -793,7 +843,7 @@ def main():
         except:
             pass
         if command == "end" or command == 0:
-            return
+            end(states)
         if type(command) is str:
             commands[command](states)
         if type(command) is int:
