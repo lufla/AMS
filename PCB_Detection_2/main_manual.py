@@ -840,14 +840,15 @@ def main():
         print("\n*", command, "*\n")
         try:
             command = int(command)
+        
+            if command == "end" or command == 0:
+                end(states)
+            if type(command) is str:
+                commands[command](states)
+            if type(command) is int:
+                list(commands.values())[command](states)
         except:
-            pass
-        if command == "end" or command == 0:
-            end(states)
-        if type(command) is str:
-            commands[command](states)
-        if type(command) is int:
-            list(commands.values())[command](states)
+            print("Invalid Command")
     
 
 if __name__ == "__main__":
