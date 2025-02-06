@@ -9,9 +9,38 @@ Use Python 3.9
 
 #### Pal Ubuntu
 
+TODO
+
+Start Tiago
+Enter the BIOS
+Select the USB Stick with the Pal Robotics Ubuntu Image as first Boot Option
+Save and Exit the BIOS
+Select Install Tiago
+?
+After the Installation
+Enter the BIOS
+Select the internal disk as first Boot Option
+Save and Exit the BIOS
+
+#### Network Configuration
+
+TODO
+
+Connect to the Tiago Hotspot
+Password in Tiago Handbook
+Open the Web Commander
+Set Network to Quadrocopter
+Enable DHCP
+Connect Development to Quadrocopter
+
 ### Development
 
 #### Pal Ubuntu
+
+TODO
+Install in VM or from USB Stick
+You can not select the partition
+Select Install Development
 
 #### Git Repository
 Clone the ```AMS``` git repository
@@ -140,6 +169,8 @@ rosrun my_controller_pkg thk_arm_xya2
 ```
 
 #### Python Scripts
+
+TODO
 
 ##### PCB Detection
 
