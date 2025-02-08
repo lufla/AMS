@@ -1,19 +1,19 @@
 my_controller_pkg/  
 &emsp;	config/  
-&emsp;&emsp;		controller.yaml			Cofiguration for own controllers  
+&emsp;&emsp;		controller.yaml	&emsp;		Configuration for own controllers  
 &emsp;	launch/  
-&emsp;&emsp;		my_controller.launch		Launch file to start own controllers  
+&emsp;&emsp;		my_controller.launch&emsp;		Launch file to start own controllers  
 &emsp;	msg/  
-&emsp;&emsp;		THK_AMS_msg1.msg		Definition of xya-message type  
-	src/  
-		my_controller.cpp		Code of the own controller  
-		thk_accuracy.cpp		Code for gazebo simulation of own controller  
-		thk_arm_xya.cpp			Publisher/Subscriber for inverse kinematics own controller  
-		thk_arm_xya2.cpp		Publisher/Subscriber for inverse kinematics PAL arm_controller  
-		thk_init_pub.cpp		Publisher to move arm in horizontal position, PAL arm_controller  
-		thk_head.cpp			Publisher to demonstrate head movement PAL head_controller  
-		thk_tiago.cpp			Gazebo demonstration of arm movement own controller  
-		thk_tiago2.cpp			Demonstration of arm movement PAL arm_controller  
-	CMakeLists.txt				CMake file  
-	package.xml				Definitions for packet dependencies  
-	thk_controllers_plugins.xml		Generated controller configuration  
+&emsp;&emsp;		THK_AMS_msg1.msg&emsp;		Definition of xya-message type  
+&emsp;	src/  
+&emsp;&emsp;		my_controller.cpp&emsp;		Code of the own controller  
+&emsp;&emsp;		thk_accuracy.cpp&emsp;		Code for gazebo simulation of own controller  
+&emsp;&emsp;		thk_arm_xya.cpp	&emsp;		Publisher/Subscriber for inverse kinematics own controller  
+&emsp;&emsp;		thk_arm_xya2.cpp&emsp;		Publisher/Subscriber for inverse kinematics PAL arm_controller  
+&emsp;&emsp;		thk_init_pub.cpp&emsp;		Publisher to move arm in horizontal position, PAL arm_controller  
+&emsp;&emsp;		thk_head.cpp&emsp;			Publisher to demonstrate head movement PAL head_controller  
+&emsp;&emsp;		thk_tiago.cpp&emsp;			Gazebo demonstration of arm movement own controller  
+&emsp;&emsp;		thk_tiago2.cpp&emsp;			Demonstration of arm movement PAL arm_controller  
+&emsp;	CMakeLists.txt		&emsp;&emsp;		CMake file  
+&emsp;	package.xml		&emsp;&emsp;		Definitions for packet dependencies  
+&emsp;	thk_controllers_plugins.xml	&emsp;&emsp;	Generated controller configuration  
