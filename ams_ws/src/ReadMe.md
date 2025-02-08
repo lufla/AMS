@@ -1,10 +1,10 @@
 my_controller_pkg/  
 &emsp;	config/  
-&emsp;&emsp;		controller.yaml	&emsp;		Configuration for own controllers  
+&emsp;&emsp;		controller.yaml	&emsp;&emsp;&emsp;		Configuration for own controllers  
 &emsp;	launch/  
-&emsp;&emsp;		my_controller.launch&emsp;		Launch file to start own controllers  
+&emsp;&emsp;		my_controller.launch&emsp;&emsp;&emsp;		Launch file to start own controllers  
 &emsp;	msg/  
-&emsp;&emsp;		THK_AMS_msg1.msg&emsp;		Definition of xya-message type  
+&emsp;&emsp;		THK_AMS_msg1.msg&emsp;&emsp;&emsp;		Definition of xya-message type  
 &emsp;	src/  
 &emsp;&emsp;		my_controller.cpp&emsp;		Code of the own controller  
 &emsp;&emsp;		thk_accuracy.cpp&emsp;		Code for gazebo simulation of own controller  
