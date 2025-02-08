@@ -1,6 +1,0 @@
-<launch>
-	<rosparam file="$(find testcont)/config/joint_position_controller.yaml" command="load"/>
-	
-	<node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen" ns="/" args="joint_position_controller" />
-</launch>
-

@@ -1,6 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-  <rosparam command="load" ns="/thk_ns" file="$(find my_controller_pkg)/config/controller.yaml" />
-  
-  <node name="my_controller_spawner" pkg="controller_manager" type="spawner" output="screen" args="thk_ns/my_controller" />
-</launch>

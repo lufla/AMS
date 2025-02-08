@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<launch>
+  <rosparam command="load" ns="/thk_ns" file="$(find my_controller_pkg)/config/controller.yaml" />
+  
+  <node name="thk_j1_controller_spawner" pkg="controller_manager" type="spawner" output="screen" args="thk_ns/thk_j1_controller" />
+
+  <node name="thk_j2_controller_spawner" pkg="controller_manager" type="spawner" output="screen" args="thk_ns/thk_j2_controller" />
+
+  <node name="thk_j3_controller_spawner" pkg="controller_manager" type="spawner" output="screen" args="thk_ns/thk_j3_controller" />
+
+  <node name="thk_j4_controller_spawner" pkg="controller_manager" type="spawner" output="screen" args="thk_ns/thk_j4_controller" />
+
+  <node name="thk_j5_controller_spawner" pkg="controller_manager" type="spawner" output="screen" args="thk_ns/thk_j5_controller" />
+
+  <node name="thk_j6_controller_spawner" pkg="controller_manager" type="spawner" output="screen" args="thk_ns/thk_j6_controller" />
+
+  <node name="thk_j7_controller_spawner" pkg="controller_manager" type="spawner" output="screen" args="thk_ns/thk_j7_controller" />
+
+</launch>

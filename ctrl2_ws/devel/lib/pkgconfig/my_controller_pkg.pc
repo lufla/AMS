@@ -1,8 +1,0 @@
-prefix=/home/pal/ctrl2_ws/devel
-
-Name: my_controller_pkg
-Description: Description of my_controller_pkg
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib -lmy_controller_pkg
-Requires: control_toolbox controller_interface pluginlib roscpp hardware_interface std_msgs control_msgs

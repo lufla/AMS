@@ -1,2 +1,0 @@
-my_controller_controller
--DCATKIN_DEVEL_PREFIX=/home/pal/AMS/catkin_ws/devel -DCMAKE_INSTALL_PREFIX=/home/pal/AMS/catkin_ws/install -G Unix Makefiles

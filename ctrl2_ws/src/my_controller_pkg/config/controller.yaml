@@ -1,5 +1,0 @@
-my_controller:
-  type: thk_ns/MyController
-  joint: arm_3_joint
-  pid: {p: 100.0, i: 0.01, d: 10.0}
-

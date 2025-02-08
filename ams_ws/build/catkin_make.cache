@@ -1,0 +1,2 @@
+my_controller_pkg
+-DCATKIN_DEVEL_PREFIX=/root/ams_ws/devel -DCMAKE_INSTALL_PREFIX=/root/ams_ws/install -G Unix Makefiles
