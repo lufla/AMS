@@ -171,6 +171,9 @@ rosrun my_controller_pkg thk_arm_xya2
 #### Python Scripts
 
 TODO
+images
+pcb orientation limits
+etc.
 
 ##### PCB Detection
 
