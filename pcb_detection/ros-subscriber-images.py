@@ -46,7 +46,7 @@ def display_image_msg(message):
     ms = int(time.time_ns() / 1_000_000)
     if CAMERA == HEAD: camera_dir = "head"
     if CAMERA == GRIPPER: camera_dir = "gripper"
-    filename = f"PCB_Detection_2/calibration/tiago/{camera_dir}/{ms}.jpg"
+    filename = f"pcb_detection/calibration/tiago/{camera_dir}/{ms}.jpg"
     
     if SAVE_IMAGES: cv.imwrite(filename=filename, img=image_cv)
 

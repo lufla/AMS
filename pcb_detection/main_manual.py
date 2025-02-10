@@ -209,7 +209,7 @@ def load_intrinsic_matrix(CAMERA):
     K_inv = np.linalg.inv(K)
     return K, K_inv
 
-def load_gerber_image(image_path="PCB_Detection_2/images/top_layer_image.png", scale_factor=0.05):
+def load_gerber_image(image_path="pcb_detection/images/top_layer_image.png", scale_factor=0.05):
     gerber = cv.imread(image_path, cv.IMREAD_UNCHANGED)
     if gerber is None:
         raise FileNotFoundError(f"Gerber image not found at {image_path}")
@@ -217,7 +217,7 @@ def load_gerber_image(image_path="PCB_Detection_2/images/top_layer_image.png", s
     gerber = cv.resize(gerber, (0, 0), fx=scale_factor, fy=scale_factor, interpolation=cv.INTER_LINEAR)
     return gerber
 
-def load_reference_image(image_path="PCB_Detection_2/images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25):
+def load_reference_image(image_path="pcb_detection/images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25):
     reference = cv.imread(image_path, cv.IMREAD_COLOR)
     if reference is None:
         raise FileNotFoundError(f"Reference image not found at {image_path}")
@@ -490,12 +490,12 @@ def setup(states):
         states["K_head"], states["K_head_inv"] = load_intrinsic_matrix(CAMERA_HEAD)
         states["K_gripper"], states["K_gripper_inv"] = load_intrinsic_matrix(CAMERA_GRIPPER)
 
-    states["gerber"] = load_gerber_image("PCB_Detection_2/images/top_layer_image.png", scale_factor=0.05)
-    states["reference"] = load_reference_image("PCB_Detection_2/images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25)
+    states["gerber"] = load_gerber_image("pcb_detection/images/top_layer_image.png", scale_factor=0.05)
+    states["reference"] = load_reference_image("pcb_detection/images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25)
     states["gerber_size_mm"] = np.array(states["gerber"].shape) / 0.05 / 90
 
     states["pnp_df"] = load_pnp_data(
-        csv_path="PCB_Detection_2/PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
+        csv_path="pcb_detection/PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
         gerber_shape=states["gerber"].shape
     )
 

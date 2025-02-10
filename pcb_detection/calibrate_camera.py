@@ -37,7 +37,7 @@ if CAMERA == CAMERA_WEBCAM: file_extension = "png"
 if CAMERA == CAMERA_HEAD: file_extension = "jpg"
 if CAMERA == CAMERA_GRIPPER: file_extension = "jpg"
 
-images = glob.glob(f"PCB_Detection_2/calibration/{camera_dir}/*.{file_extension}")
+images = glob.glob(f"pcb_detection/calibration/{camera_dir}/*.{file_extension}")
 
 for fname in images:
     img = cv.imread(fname)

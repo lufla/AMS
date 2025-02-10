@@ -16,19 +16,19 @@ K = np.float32(config_json["camera_matrix"])
 
 K_inv = np.linalg.inv(K)
 
-#file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "PCB_Detection_2/images/top_layer_image.png")
-gerber = cv.imread("PCB_Detection_2/images/top_layer_image.png", cv.IMREAD_UNCHANGED)
+#file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pcb_detection/images/top_layer_image.png")
+gerber = cv.imread("pcb_detection/images/top_layer_image.png", cv.IMREAD_UNCHANGED)
 
 gerber = cv.flip(gerber, 0)
 gerber = cv.resize(gerber, (0,0), fx=0.05, fy=0.05, interpolation=cv.INTER_LINEAR)
 print("gerber.shape: ", gerber.shape)
 
-reference = cv.imread("PCB_Detection_2/images/PP3_FPGA_Tester_Scan.png", cv.IMREAD_COLOR)
+reference = cv.imread("pcb_detection/images/PP3_FPGA_Tester_Scan.png", cv.IMREAD_COLOR)
 #reference = cv.resize(reference, (720, 480), interpolation=cv.INTER_LINEAR)
 reference = cv.resize(reference, (0,0), fx=0.25, fy=0.25, interpolation=cv.INTER_LINEAR)
 print("reference.shape: ", reference.shape)
 
-pnp_df = pd.read_csv("PCB_Detection_2/PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
+pnp_df = pd.read_csv("pcb_detection/PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
     header=None, sep="\t", index_col=False, usecols=[0,1,2,3])
 # 5:3, 160, 96, 160*90=14400
 #pnp_df[1] = pnp_df[1] / 160
