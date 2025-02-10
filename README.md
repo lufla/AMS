@@ -98,11 +98,7 @@ SAVE_IMAGES = True
 The script will take an image every 2 seconds.
 To stop recording press ```q``` in the image window.
 
-<<<<<<< HEAD
 The images will be saved in ```PCB_Detection_2/calibration/```.
-=======
-The images will be saved in ```pcb_detection/calibration/tiago/```.
->>>>>>> cf10c9c7c64a7632d2293eeab01f79391590dbcc
 
 For calibrating the webcam you can use the ```take_calibration_images.py``` python script.
 
@@ -214,27 +210,23 @@ All angles are measured in radians and distances are measured in meters.
 
 The script ```main_manual.py``` can perform multiple commands.
 
-```end```: Stops the script
+```end```: Stops the script.
 
-```hello```: Prints "hello"
+```hello```: Prints "hello".
 
-```detect_cutout```: Uses template matching to find the pcb cutout around the currently selected component and displays the result. Can be stopped by pressing ```q```
+```detect_cutout```: Uses template matching to find the pcb cutout around the currently selected component and displays the result. Can be stopped by pressing ```q```.
 
-```detect_pcb```: Detects the PCB Outline and based on this, calculates its position and displays the results. Can be stopped by pressing ```q```. The last PCB position gets stored for further use. The terminal outputs the 3D coordinates 
+```detect_pcb```: Detects the PCB Outline and based on this, calculates its position and displays the results. Can be stopped by pressing ```q```. The last PCB position gets stored for further use. The terminal outputs the 3D coordinates of the top left PCB corner relative to the camera. The X axis runs left to right. The Y axis runs top to bottom and the Z Axia represents the depth. Assuming correct calibration, the unit is mm.
 
-```calculate_component_pcb_position```: Calculates the position of the currently selected Component on the PCB in relation to the camera. The result is stored and displayed in the terminal
+```calculate_component_pcb_position```: Calculates the position of the currently selected component on the PCB in relation to the camera. The result is stored and displayed in the terminal.
 
-```end```: stops the script
+```set_component_index```: Reads in a component index and stores it.
 
-```end```: stops the script
+```move_arm_over_component```: Moves the arm over the last calculated component position.
 
+```move_head```: Makes the head look down onto the PCB.
 
-    "detect_cutout": detect_cutout,
-    "detect_component": detect_component,
-    "detect_pcb": detect_pcb,
-    "calculate_component_pcb_position": calculate_component_pcb_position,
-    "set_component_index": set_component_index,
-    "move_arm_over_component": move_arm_over_component,
-    "move_head": move_head,
-    "reset_arm": reset_arm,
-    "show_head_transform": show_head_transform,
+```reset_arm```: Moves the arm to the leftmost position to have a clear view on the PCB.
+
+```show_head_transform```: Display the latest transformation supplied by ROS, from the head camera coordinate frame to the coordinate frame relative to the first arm joint.
+
