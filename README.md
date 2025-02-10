@@ -169,6 +169,7 @@ For the python scripts to control the tiago arm, start the thk_arm_xya2 controll
 rosrun my_controller_pkg thk_arm_xya2
 ```
 
+There are additional ReadMe files for simulation and demonstration of the mechanical hardware in the folder 'docs'.
 #### Python Scripts
 
 ##### PCB and IC Detection
