@@ -5,42 +5,37 @@ Use Python 3.9
 
 ## Installation
 
+Detailed instruction are also available in the (printed) TIAGo handbook (in the lab).
+
 ### Tiago
 
 #### Pal Ubuntu
 
-TODO
-
-Start Tiago
-Enter the BIOS
-Select the USB Stick with the Pal Robotics Ubuntu Image as first Boot Option
-Save and Exit the BIOS
-Select Install Tiago
-?
-After the Installation
-Enter the BIOS
-Select the internal disk as first Boot Option
-Save and Exit the BIOS
+To install the Tiago Operating System first open the service panel at the front bottom right if the robot.
+Plug in a HDMI Display and a USB Keyboard and insert a USB Stick with Pal Ubuntu Image.
+Then start Tiago and press F2 repeatedly until the BIOS menu opens.
+Select the USB Stick with the Pal Ubuntu Image as first Boot Option.
+And leave the BIOS with the save and exit option.
+You will have three options for installation.
+Select the ```Install TIAGo``` option and then configure country and keyboard layout.
+After the Installation shutdown the robot and reset the internal disk as first Boot Option in the BIOS.
 
 #### Network Configuration
 
-TODO
-
-Connect to the Tiago Hotspot
-Password in Tiago Handbook
-Open the Web Commander
-Set Network to Quadrocopter
-Enable DHCP
-Connect Development to Quadrocopter
+To connect TIAGo to a WiFi network after installation,
+connect to the Tiago via its WiFi Hotspot or an Ethernet cable
+The password can be found the Tiago handbook.
+Then open the Web Commander, select the Networking tab and enter the configuration.
+Enter the SSID and Password of the WiFi Network you want to connect to enable DHCP or configure the address manually.
 
 ### Development
 
 #### Pal Ubuntu
 
-TODO
-Install in VM or from USB Stick
-You can not select the partition
-Select Install Development
+To install the Development Version of the Pal Ubuntu Image perform the same steps as in
+[Installation Tiago](#pal-ubuntu) but select the ```Install Development TIAGo``` option.
+Alternatively you can install the Pal Ubuntu Image in a Virtual Machine.
+**Be careful if you want to install the Image on a real machine directly, because you can not choose the target disk or partition.** 
 
 #### Git Repository
 Clone the ```AMS``` git repository
@@ -103,7 +98,7 @@ SAVE_IMAGES = True
 The script will take an image every 2 seconds.
 To stop recording press ```q``` in the image window.
 
-The images will be saved in ```PCB_Detection_2/calibration/tiago/```.
+The images will be saved in ```PCB_Detection_2/calibration/```.
 
 For calibrating the webcam you can use the ```take_calibration_images.py``` python script.
 
@@ -173,22 +168,69 @@ rosrun my_controller_pkg thk_arm_xya2
 
 #### Python Scripts
 
-main.py
-main_detection.py
-main_manual.py
+##### PCB and IC Detection
 
-ros-subscriber-images.py?
-take_calibration_images.py?
+The ```main.py``` script only includes the PCB detection and works with a webcam.
 
-roslibpy-arm-test.py
-roslibpy-head-test.py
+After starting the script, multiple images will be displayed.
+
+```reference```: shows the reference image of the PCB
+
+```frame```: displays the camera input together with an overlay of the detected contours, the gerber overlay and component positions of the PCB
+
+```canny```: displays the canny filtered camera input
+
+```thresh```: displays the thresholded camera input used for contour detection
+
+```perspective```: shows the current camera input corrected by the inverse perspective transformation to show the detected PCB, together with an overlay of the gerber image and the component positions
+
+```reference_cutout```: shows a cutout from the reference image around the component ```IC1```.
+
+```input_cutout```: shows the camera input together with the region where the ```reference_cutout``` image was matches as a template
+
+---
+
+The ```main_detection.py``` script can connect to ROS and use the head or gripper camera of Tiago.
+It performs PCB Detection as well as IC Detection.
+To switch between Webcam and Tiago Cameras set to ```USE_WEBCAM``` variable to either ```True``` or ```False```
+The script displays the additional image ```All Rotations``` in which IC labels and the corresponding ICs next to the label are detected and highlighted.
 
 
-TODO
-images
-pcb orientation limits
-etc.
+##### Robot Control
 
-##### PCB Detection
+The scripts ```roslibpy-arm-test.py``` and ```roslibpy-head-test.py``` can be used to control the arm and head of tiago manually.
 
-##### IC Detection
+The head has two joints to control.
+Head joint 1 pans left and right and head joint 2 tilts up and down.
+
+The arm can be controlloed with x and y coordinates relative to the first arm joint. The x axis runs back to front and the y axis runs from right to left, both from the view of the robots head.
+Additionally the gripper rotation has to be given.
+
+All angles are measured in radians and distances are measured in meters.
+
+The script ```main_manual.py``` can perform multiple commands.
+
+```end```: Stops the script
+
+```hello```: Prints "hello"
+
+```detect_cutout```: Uses template matching to find the pcb cutout around the currently selected component and displays the result. Can be stopped by pressing ```q```
+
+```detect_pcb```: Detects the PCB Outline and based on this, calculates its position and displays the results. Can be stopped by pressing ```q```. The last PCB position gets stored for further use. The terminal outputs the 3D coordinates 
+
+```calculate_component_pcb_position```: Calculates the position of the currently selected Component on the PCB in relation to the camera. The result is stored and displayed in the terminal
+
+```end```: stops the script
+
+```end```: stops the script
+
+
+    "detect_cutout": detect_cutout,
+    "detect_component": detect_component,
+    "detect_pcb": detect_pcb,
+    "calculate_component_pcb_position": calculate_component_pcb_position,
+    "set_component_index": set_component_index,
+    "move_arm_over_component": move_arm_over_component,
+    "move_head": move_head,
+    "reset_arm": reset_arm,
+    "show_head_transform": show_head_transform,

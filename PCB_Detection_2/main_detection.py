@@ -19,6 +19,8 @@ CAMERA_WEBCAM = 1
 CAMERA_HEAD = 2
 CAMERA_GRIPPER = 3
 
+USE_WEBCAM = True
+
 confidence_threshold = os.getenv("confidenceThreshold")
 if confidence_threshold is None:
     confidence_threshold = 0.95
@@ -204,7 +206,7 @@ def load_intrinsic_matrix(CAMERA):
     K_inv = np.linalg.inv(K)
     return K, K_inv
 
-def load_gerber_image(image_path="images/top_layer_image.png", scale_factor=0.05):
+def load_gerber_image(image_path="PCB_Detection_2/images/top_layer_image.png", scale_factor=0.05):
     gerber = cv.imread(image_path, cv.IMREAD_UNCHANGED)
     if gerber is None:
         raise FileNotFoundError(f"Gerber image not found at {image_path}")
@@ -212,7 +214,7 @@ def load_gerber_image(image_path="images/top_layer_image.png", scale_factor=0.05
     gerber = cv.resize(gerber, (0, 0), fx=scale_factor, fy=scale_factor, interpolation=cv.INTER_LINEAR)
     return gerber
 
-def load_reference_image(image_path="images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25):
+def load_reference_image(image_path="PCB_Detection_2/images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25):
     reference = cv.imread(image_path, cv.IMREAD_COLOR)
     if reference is None:
         raise FileNotFoundError(f"Reference image not found at {image_path}")
@@ -434,16 +436,18 @@ def main_fused():
     # (B) SETUP FOR PART 2 (CALIBRATION + OVERLAY)
     config = load_config()
     camera_index = int(config.get("camera_index", 0))
-    K, K_inv = load_intrinsic_matrix(CAMERA_WEBCAM)
-    K_head, K_head_inv = load_intrinsic_matrix(CAMERA_HEAD)
-    K_gripper, K_gripper_inv = load_intrinsic_matrix(CAMERA_GRIPPER)
+    if USE_WEBCAM:
+        K, K_inv = load_intrinsic_matrix(CAMERA_WEBCAM)
+    else:
+        #K, K_inv = load_intrinsic_matrix(CAMERA_HEAD)
+        K, K_inv = load_intrinsic_matrix(CAMERA_GRIPPER)
 
-    gerber = load_gerber_image("images/top_layer_image.png", scale_factor=0.05)
-    reference = load_reference_image("images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25)
+    gerber = load_gerber_image("PCB_Detection_2/images/top_layer_image.png", scale_factor=0.05)
+    reference = load_reference_image("PCB_Detection_2/images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25)
     gerber_size_mm = np.array(gerber.shape) / 0.05 / 90
 
     pnp_df = load_pnp_data(
-        csv_path="PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
+        csv_path="PCB_Detection_2/PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
         gerber_shape=gerber.shape
     )
 
@@ -451,12 +455,15 @@ def main_fused():
 
     #cap, width, height = initialize_camera(camera_index)
     #print(f"Camera opened with width={width}, height={height}")
-    client = initialize_ros_connection()
-    initialize_tiago_head_camera(client)
-    initialize_tiago_gripper_camera(client)
+    if USE_WEBCAM:
+        cap, _, _ = initialize_camera(camera_index)
+    else:
+        client = initialize_ros_connection()
+        initialize_tiago_head_camera(client)
+        initialize_tiago_gripper_camera(client)
 
-    while(tiago_image_head_cache is None or tiago_image_gripper_cache is None):
-        pass
+        while(tiago_image_head_cache is None or tiago_image_gripper_cache is None):
+            pass
 
     # For perspective tracking
     moving_average_contour = np.float32([[[80,80], [640,80], [80,400], [640,400]]])
@@ -467,11 +474,13 @@ def main_fused():
     while True:
         e1 = cv.getTickCount()
 
-        # Grab frame
-        #ret, frame = cap.read()
-        ret = True
-        #frame = tiago_image_head_cache
-        frame = tiago_image_gripper_cache
+        if USE_WEBCAM:
+            # Grab frame
+            ret, frame = cap.read()
+        else:
+            ret = True
+            #frame = tiago_image_head_cache
+            frame = tiago_image_gripper_cache
         
         if not ret:
             print("Failed to read frame. Exiting.")
@@ -516,7 +525,7 @@ def main_fused():
 
         # 6) Draw PnP-based PCB points
         pcb_points, camera_screen_points = draw_pcb_points(
-            gerber, perspective, pnp_df, gerber_size_mm, M_inv, frame, K_gripper_inv
+            gerber, perspective, pnp_df, gerber_size_mm, M_inv, frame, K_inv
         )
 
         # 7) Overlay Gerber image onto the live camera

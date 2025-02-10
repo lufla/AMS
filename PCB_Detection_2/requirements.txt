@@ -10,5 +10,5 @@ opencv-python
 pandas
 roslibpy
 scipy
-dotenv
+python-dotenv
 easyocr

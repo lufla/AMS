@@ -21,7 +21,7 @@ CAMERA_WEBCAM = 1
 CAMERA_HEAD = 2
 CAMERA_GRIPPER = 3
 
-USE_WEBCAM = False
+USE_WEBCAM = True
 
 confidence_threshold = os.getenv("confidenceThreshold")
 if confidence_threshold is None:
