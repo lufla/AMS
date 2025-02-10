@@ -98,7 +98,7 @@ SAVE_IMAGES = True
 The script will take an image every 2 seconds.
 To stop recording press ```q``` in the image window.
 
-The images will be saved in ```PCB_Detection_2/calibration/```.
+The images will be saved in ```pcb_detection/calibration/```.
 
 For calibrating the webcam you can use the ```take_calibration_images.py``` python script.
 
@@ -126,6 +126,8 @@ sudo addLocalDns -u development -i 0.0.0.0
 ```
 
 Before using the python scripts also run the following commands.
+The first command stops the head from looking around.
+The second command starts publishing the images from the gripper camera and runs the service in the background.
 ```bash
 rosnode kill /pal_head_manager
 rosrun tiago_bringup end_effector_camera.sh & disown
