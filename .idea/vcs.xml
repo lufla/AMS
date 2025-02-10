@@ -2,8 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/training_writing_detection/Train IC/yolov5" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/training_writing_detection/ultralytics" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/training_writing_detection/yolov5" vcs="Git" />
   </component>
 </project>
