@@ -25,9 +25,9 @@ After the Installation shutdown the robot and reset the internal disk as first B
 
 To connect TIAGo to a WiFi network after installation,
 connect to the TIAGo via its WiFi Hotspot or an Ethernet cable
-The password can be found the TIAGo handbook.
+The password can be found in the TIAGo handbook.
 Then open the Web Commander, select the Networking tab and enter the configuration.
-Enter the SSID and Password of the WiFi Network you want to connect to enable DHCP or configure the address manually.
+Enter the SSID and Password of the WiFi Network you want to connect to and enable DHCP or configure the IP address manually.
 
 ### Development
 
