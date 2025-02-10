@@ -7,13 +7,14 @@ Use Python 3.9
 
 Detailed instruction are also available in the (printed) TIAGo handbook (in the lab).
 
-### Tiago
+### TIAGo
 
 #### Pal Ubuntu
 
-To install the Tiago Operating System first open the service panel at the front bottom right if the robot.
-Plug in a HDMI Display and a USB Keyboard and insert a USB Stick with Pal Ubuntu Image.
-Then start Tiago and press F2 repeatedly until the BIOS menu opens.
+To install the TIAGo Operating System first open the service panel at the front bottom right of the robot.
+Plug in a HDMI Display and a USB Keyboard and insert a USB Stick with the Pal Ubuntu Image.
+The USB Stick can also be inserted in the panel at the top of TIAGo.
+Then start TIAGo and press F2 repeatedly until the BIOS menu opens.
 Select the USB Stick with the Pal Ubuntu Image as first Boot Option.
 And leave the BIOS with the save and exit option.
 You will have three options for installation.
@@ -23,8 +24,8 @@ After the Installation shutdown the robot and reset the internal disk as first B
 #### Network Configuration
 
 To connect TIAGo to a WiFi network after installation,
-connect to the Tiago via its WiFi Hotspot or an Ethernet cable
-The password can be found the Tiago handbook.
+connect to the TIAGo via its WiFi Hotspot or an Ethernet cable
+The password can be found the TIAGo handbook.
 Then open the Web Commander, select the Networking tab and enter the configuration.
 Enter the SSID and Password of the WiFi Network you want to connect to enable DHCP or configure the address manually.
 
@@ -33,7 +34,7 @@ Enter the SSID and Password of the WiFi Network you want to connect to enable DH
 #### Pal Ubuntu
 
 To install the Development Version of the Pal Ubuntu Image perform the same steps as in
-[Installation Tiago](#pal-ubuntu) but select the ```Install Development TIAGo``` option.
+[Installation TIAGo](#pal-ubuntu) but select the ```Install Development TIAGo``` option.
 Alternatively you can install the Pal Ubuntu Image in a Virtual Machine.
 **Be careful if you want to install the Image on a real machine directly, because you can not choose the target disk or partition.** 
 
@@ -70,9 +71,9 @@ rosrun pal_deploy deploy.py -p my_controller_pkg tiago-158c
 
 ## Setup
 
-### Tiago
+### TIAGo
 
-Before using Tiago check if time matches the time of development pc using the ```date``` command.
+Before using TIAGo check if time matches the time of development pc using the ```date``` command.
 
 To set the time on tiago you can use the following command. Replace ```00:00 CET``` with the time of the development pc.
 
@@ -116,7 +117,7 @@ After the calibration is done it will output the mean reprojection error.
 
 ## Usage
 
-### Tiago Start
+### TIAGo Start
 
 After every restart of tiago.
 Replace ```0.0.0.0``` with ip address of the development pc
@@ -138,7 +139,7 @@ rosrun tiago_bringup end_effector_camera.sh & disown
 
 #### ROS Connection
 
-Connect the development pc to ROS on Tiago.
+Connect the development pc to ROS on TIAGo.
 
 ```bash
 export ROS_MASTER_URI=http://tiago-158c:11311
@@ -192,9 +193,9 @@ After starting the script, multiple images will be displayed.
 
 ---
 
-The ```main_detection.py``` script can connect to ROS and use the head or gripper camera of Tiago.
+The ```main_detection.py``` script can connect to ROS and use the head or gripper camera of TIAGo.
 It performs PCB Detection as well as IC Detection.
-To switch between Webcam and Tiago Cameras set to ```USE_WEBCAM``` variable to either ```True``` or ```False```
+To switch between Webcam and TIAGo Cameras set to ```USE_WEBCAM``` variable to either ```True``` or ```False```
 The script displays the additional image ```All Rotations``` in which IC labels and the corresponding ICs next to the label are detected and highlighted.
 
 
