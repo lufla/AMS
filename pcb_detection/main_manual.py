@@ -9,9 +9,11 @@ import cv2
 import cv2 as cv
 import numpy as np
 import pandas as pd
-import easyocr
+#import easyocr
 from dotenv import load_dotenv, dotenv_values
 import roslibpy
+import scipy
+import scipy.spatial
 
 load_dotenv()  # Load env variables (confidenceThreshold, etc.)
 
@@ -34,6 +36,7 @@ print(f"Confidence Threshold: {confidence_threshold}")
 
 tiago_image_head_cache = None
 tiago_image_gripper_cache = None
+tiago_head_arm_transform_cache = None
 
 def calculate_confidence(contour, mask, frame):
     confidence = 1
@@ -265,6 +268,52 @@ def initialize_tiago_gripper_camera(client):
         tiago_image_gripper_cache = img
     topic.subscribe(lambda message: set_gripper_cache(decode_image_message(message)))
 
+tf_stream_topic = None
+def initialize_head_arm_transform_stream(client):
+
+    topic_result = roslibpy.Topic(client, '/tf_stream/result', 'tf_lookup/TfStreamActionResult')
+
+    def check_tf_stream_result(message):
+        global tf_stream_topic
+        tf_stream_topic = message["result"]["topic"]
+
+    topic_result.subscribe(lambda message: check_tf_stream_result(message))
+
+    time.sleep(1)
+
+    topic_goal = roslibpy.Topic(client, '/tf_stream/goal', 'std_msgs/String')
+
+    topic_goal.publish(
+        {
+            "goal": {
+            "transforms": [
+                { "target": "arm_1_link", "source": "xtion_rgb_frame" }
+            ],
+            "subscription_id": "",
+            "update": False,
+            }
+        }
+    )
+
+    while tf_stream_topic is None:
+        print("Waiting for transform stream topic")
+        time.sleep(1)
+
+    topic_stream = roslibpy.Topic(client, tf_stream_topic, 'tf/tfMessage')
+
+    def set_head_arm_transform_cache(message):
+        global tiago_head_arm_transform_cache
+        translation = message["transforms"][0]["transform"]["translation"]
+        tvec = [translation["x"], translation["y"], translation["z"]]
+        rot_q = message["transforms"][0]["transform"]["rotation"]
+        rot_q_array = [rot_q["x"], rot_q["y"], rot_q["z"], rot_q["w"]]
+        rotation = scipy.spatial.transform.Rotation.from_quat(rot_q_array)
+        rmat = rotation.as_matrix()
+        tiago_head_arm_transform_cache = {"tvec": tvec, "rmat": rmat}
+
+
+
+    topic_stream.subscribe(lambda message: set_head_arm_transform_cache(message))
 
 def initialize_camera(camera_index=0, width=None, height=None):
     cap = cv.VideoCapture(camera_index)
@@ -293,7 +342,7 @@ def find_and_draw_contours(frame, thresh):
     contour_list, hull_list, approx_list = [], [], []
     for cnt in contours:
         area = cv.contourArea(cnt)
-        if 200 < area < frame.shape[0] * frame.shape[1] * 0.9:
+        if 200 < area < frame.shape[0] * frame.shape[1] * 0.2: # min and max contour area
             contour_list.append(cnt)
             hull = cv.convexHull(cnt)
             hull_list.append(hull)
@@ -420,8 +469,7 @@ def draw_pcb_points(gerber, perspective, pnp_df, gerber_size_mm, M_inv, frame, K
 
     return pcb_points, camera_screen_points
 
-
-def main_fused():
+def setup(states):
     """
     A single main() that runs:
       - Black squares detection + OCR (in 4 rotations shown in one window)
@@ -430,65 +478,154 @@ def main_fused():
     """
 
     # (A) SETUP FOR PART 1 (BLACK SQUARE + OCR)
-    reader = easyocr.Reader(['en'], gpu=True)
-    pattern = re.compile(r'^IC\d+$')
+    #states["reader"] = easyocr.Reader(['en'], gpu=True)
+    #states["pattern"] = re.compile(r'^IC\d+$')
 
     # (B) SETUP FOR PART 2 (CALIBRATION + OVERLAY)
     config = load_config()
     camera_index = int(config.get("camera_index", 0))
     if USE_WEBCAM:
-        K, K_inv = load_intrinsic_matrix(CAMERA_WEBCAM)
+        states["K"], states["K_inv"] = load_intrinsic_matrix(CAMERA_WEBCAM)
     else:
-        #K, K_inv = load_intrinsic_matrix(CAMERA_HEAD)
-        K, K_inv = load_intrinsic_matrix(CAMERA_GRIPPER)
+        states["K_head"], states["K_head_inv"] = load_intrinsic_matrix(CAMERA_HEAD)
+        states["K_gripper"], states["K_gripper_inv"] = load_intrinsic_matrix(CAMERA_GRIPPER)
 
-    gerber = load_gerber_image("pcb_detection/images/top_layer_image.png", scale_factor=0.05)
-    reference = load_reference_image("pcb_detection/images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25)
-    gerber_size_mm = np.array(gerber.shape) / 0.05 / 90
+    states["gerber"] = load_gerber_image("pcb_detection/images/top_layer_image.png", scale_factor=0.05)
+    states["reference"] = load_reference_image("pcb_detection/images/PP3_FPGA_Tester_Scan.png", scale_factor=0.25)
+    states["gerber_size_mm"] = np.array(states["gerber"].shape) / 0.05 / 90
 
-    pnp_df = load_pnp_data(
+    states["pnp_df"] = load_pnp_data(
         csv_path="pcb_detection/PP3_FPGA_Tester/CAMOutputs/Assembly/PnP_PP3_FPGA_Tester_v3_front.txt",
-        gerber_shape=gerber.shape
+        gerber_shape=states["gerber"].shape
     )
 
-    ic_center_pixel, cutout_radius = calculate_ic_center(pnp_df, reference.shape)
-
-    #cap, width, height = initialize_camera(camera_index)
-    #print(f"Camera opened with width={width}, height={height}")
     if USE_WEBCAM:
-        cap, _, _ = initialize_camera(camera_index)
+        cap, width, height = initialize_camera(camera_index)
+        print(f"Camera opened with width={width}, height={height}")
+
+        if not cap.isOpened():
+            print("Cannot open camera")
+            exit()
+        
+        states["cap"] = cap
     else:
         client = initialize_ros_connection()
+        states["client"] = client
         initialize_tiago_head_camera(client)
         initialize_tiago_gripper_camera(client)
+        initialize_head_arm_transform_stream(client)
 
-        while(tiago_image_head_cache is None or tiago_image_gripper_cache is None):
-            pass
+        while(
+            tiago_image_head_cache is None
+            or tiago_image_gripper_cache is None
+            or tiago_head_arm_transform_cache):
+            if tiago_image_head_cache is None:
+                print("Waiting for head camera images")
+            if tiago_image_gripper_cache is None:
+                print("Waiting for gripper camera images")
+            if tiago_head_arm_transform_cache is None:
+                print("Waiting for head arm transform")
+            time.sleep(1)
 
+
+def printhello(states):
+    print("hello")
+
+def detect_cutout(states, component_index):
+    print("Press 'q' to quit.")
+    while True:
+        # Grab frame
+        if USE_WEBCAM:
+            ret, frame = states["cap"].read()
+ 
+            # if frame is read correctly ret is True
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                break
+            
+            K = states["K"]
+            K_inv = states["K_inv"]
+        else:
+            frame = tiago_image_gripper_cache.copy()
+        
+            if frame is None:
+                print("Failed to read frame. Exiting.")
+                break
+            
+            K = states["K_gripper"]
+            K_inv = states["K_gripper_inv"]
+
+        # 5) Template matching for a known IC
+        ic_center_pixel, cutout_radius = calculate_ic_center(states["pnp_df"], states["reference"].shape, component_index)
+        reference_cutout, ref_cutout_canny, ref_cutout_gray, ic_cutout_center = get_ic_cutout(
+            states["reference"], ic_center_pixel, cutout_radius
+        )
+        input_cutout_gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        try:
+            top_left, bottom_right = perform_template_matching(input_cutout_gray, ref_cutout_gray)
+            cv.rectangle(frame, top_left, bottom_right, (255, 0, 0), 2)
+        except cv.error as e:
+            print(f"Template matching error: {e}")
+
+def detect_component(states):
+    print("Press 'q' to quit.")
+    while True:
+        # Grab frame
+        if USE_WEBCAM:
+            ret, frame = states["cap"].read()
+ 
+            # if frame is read correctly ret is True
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                break
+            
+            K = states["K"]
+            K_inv = states["K_inv"]
+        else:
+            frame = tiago_image_gripper_cache.copy()
+        
+            if frame is None:
+                print("Failed to read frame. Exiting.")
+                break
+            
+            K = states["K_gripper"]
+            K_inv = states["K_gripper_inv"]
+
+        # Show all four rotations in "All Rotations" window
+        process_frame_with_rotations_in_one_window(frame, states["reader"], states["pattern"])
+
+    pass
+
+def detect_pcb(states):
     # For perspective tracking
     moving_average_contour = np.float32([[[80,80], [640,80], [80,400], [640,400]]])
-    tvecs_history = []
 
     print("Press 'q' to quit.")
-
     while True:
         e1 = cv.getTickCount()
 
+        # Grab frame
         if USE_WEBCAM:
-            # Grab frame
-            ret, frame = cap.read()
+            ret, frame = states["cap"].read()
+ 
+            # if frame is read correctly ret is True
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                break
+            
+            K = states["K"]
+            K_inv = states["K_inv"]
         else:
-            ret = True
-            #frame = tiago_image_head_cache
-            frame = tiago_image_gripper_cache
+            frame = tiago_image_head_cache.copy()
         
-        if not ret:
-            print("Failed to read frame. Exiting.")
-            break
-        frame_copy = frame.copy()  # We'll need a clean copy for template matching, etc.
+            if frame is None:
+                print("Failed to read frame. Exiting.")
+                break
 
-        # Show all four rotations in "All Rotations" window
-        process_frame_with_rotations_in_one_window(frame, reader, pattern)
+            K = states["K_head"]
+            K_inv = states["K_head_inv"]
+
+        frame_clean = frame.copy()
 
         # 1) Preprocessing
         gray, thresh, canny = preprocess_frame(frame)
@@ -499,6 +636,18 @@ def main_fused():
         if approx_filtered:
             cv.drawContours(frame, approx_filtered, -1, (127, 127, 255), 4, cv.LINE_AA)
 
+            """
+            # find average PCB Color
+            mask = np.zeros(frame_clean.shape, np.uint8)
+            print(approx_filtered[0][0][0])
+            print(approx_filtered[1][0][0])
+            print(approx_filtered[2][0][0])
+            print(approx_filtered[3][0][0])
+            mask = cv.drawContours(mask, approx_filtered, -1, (255,255,255),1)
+            average_color = cv.mean(frame_clean, mask)
+            print("avg col: ", average_color)
+            """
+
         # 3) Update moving average contour
         if approx_filtered:
             moving_average_contour = update_moving_average_contour(moving_average_contour, approx_filtered[0])
@@ -506,64 +655,65 @@ def main_fused():
         # 4) Perspective transform
         try:
             M, M_inv, perspective, perspective_clean = compute_perspective_transform(
-                moving_average_contour, gerber.shape, frame.shape, frame
+                moving_average_contour, states["gerber"].shape, frame.shape, frame
             )
+
+            
         except cv.error as e:
             print(f"Perspective transform error: {e}")
             continue
 
-        # 5) Template matching for a known IC
-        reference_cutout, ref_cutout_canny, ref_cutout_gray, ic_cutout_center = get_ic_cutout(
-            reference, ic_center_pixel, cutout_radius
-        )
-        input_cutout_gray = cv.cvtColor(frame_copy, cv.COLOR_BGR2GRAY)
-        try:
-            top_left, bottom_right = perform_template_matching(input_cutout_gray, ref_cutout_gray)
-            cv.rectangle(frame_copy, top_left, bottom_right, (255, 0, 0), 2)
-        except cv.error as e:
-            print(f"Template matching error: {e}")
-
         # 6) Draw PnP-based PCB points
         pcb_points, camera_screen_points = draw_pcb_points(
-            gerber, perspective, pnp_df, gerber_size_mm, M_inv, frame, K_inv
+            states["gerber"], perspective, states["pnp_df"], states["gerber_size_mm"], M_inv, frame, K_inv
         )
 
         # 7) Overlay Gerber image onto the live camera
         try:
             if M_inv is not None:
-                transformed_overlay = cv.warpPerspective(gerber, M_inv, (frame.shape[1], frame.shape[0]))
+                transformed_overlay = cv.warpPerspective(states["gerber"], M_inv, (frame.shape[1], frame.shape[0]))
                 frame = overlay_images(frame, transformed_overlay)
         except cv.error as e:
             print(f"Overlay error: {e}")
 
         # 8) Camera calibration (if enough points)
-        if len(pcb_points) >= 4 and len(camera_screen_points) >= 4:
-            obj_points = [np.float32([[p[0], p[1], 0] for p in pcb_points])]
-            img_points = [np.float32([[p[0], p[1]] for p in camera_screen_points])]
-            try:
-                ret_val, mtx, dist, rvecs, tvecs = calibrate_camera(
-                    obj_points, img_points, gray.shape[::-1]
-                )
-                if tvecs and len(tvecs) > 0:
-                    tvec = tvecs[0].reshape(3)
-                    tvecs_history.append(tvec)
-                    if len(tvecs_history) > 60:
-                        tvecs_history.pop(0)
+        obj_points_pnp = np.float32([[x[0], x[1], 0] for x in pcb_points])
+        imgpoints_pnp = np.float32([x[0:2] for x in camera_screen_points])
 
-                    tvecs_avg = np.mean(tvecs_history, axis=0)
-                    print("Average tvecs:", tvecs_avg)
-            except cv.error as e:
-                print(f"Calibration error: {e}")
+        ret, rvecs, tvecs = cv.solvePnP(obj_points_pnp, imgpoints_pnp, K, None)
+        states["pcb_rvecs"] = rvecs
+        states["pcb_tvecs"] = tvecs
+
+        pcb_corner = np.float32([0, 0, 0]).reshape(3,1)
+
+        rmat = cv.Rodrigues(rvecs)[0]
+        #print(rmat)
+        pcb_corner_camera_point = (np.matmul(rmat, pcb_corner) + tvecs).reshape(3)
+        print(pcb_corner_camera_point)
+
+        axis = np.float32([[50,0,0], [0,50,0], [0,0,-50]]).reshape(-1,3)
+        axis_image, jac = cv.projectPoints(axis, rvecs, tvecs, K, None)
+        axis_image = np.int32(axis_image)
+        #print(axis_image)
+        corner = np.matmul(M_inv, [0, 0, 1])
+        corner = corner / corner[2]
+        corner = np.int32(corner[0:2])
+        #print(corner)
+        frame = cv.line(frame, corner, axis_image[0][0], (255,0,0), 5)
+        frame = cv.line(frame, corner, axis_image[1][0], (0,255,0), 5)
+        frame = cv.line(frame, corner, axis_image[2][0], (0,0,255), 5)
 
         # 9) Show windows from Part 2
-        cv.imshow("Canny", canny)
         cv.imshow("Frame", frame)
-        cv.imshow("Threshold", thresh)
-        cv.imshow("Perspective", perspective)
-        cv.imshow("Gerber", gerber)
-        cv.imshow("Input Cutout", frame_copy)  # Show the rectangle for template matching
-        cv.imshow("Reference", reference)
-        cv.imshow("Reference Cutout", reference_cutout)
+        #cv.imshow("Canny", canny)
+        #cv.imshow("Threshold", thresh)
+        #cv.imshow("Perspective", perspective)
+        cv.imshow("Perspective Clean", perspective_clean)
+        #cv.imshow("Gerber", states["gerber"])
+        #cv.imshow("Gerber", states["gerber"])
+
+        #cv.imshow("Input Cutout", frame_copy)  # Show the rectangle for template matching
+        #cv.imshow("Reference Cutout", reference_cutout)
 
         # Quit check
         if cv.waitKey(1) & 0xFF == ord('q'):
@@ -571,10 +721,135 @@ def main_fused():
 
         e2 = cv.getTickCount()
         elapsed_time = (e2 - e1) / cv.getTickFrequency()
-        print(f"Processing Time: {elapsed_time:.6f}s", end="\r", flush=True)
+        #print(f"Processing Time: {elapsed_time:.6f}s", end="\r", flush=True)
 
     #cap.release()
     cv.destroyAllWindows()
 
+def calculate_component_pcb_position(states, component_index = 25):
+    # check states
+    if states["pcb_rvecs"] is None:
+        print("Error: \"pcb_rvecs\" is None")
+        return
+    
+    if states["pcb_tvecs"] is None:
+        print("Error: \"pcb_tvecs\" is None")
+        return
+    
+    ic_center_pixel, cutout_radius = calculate_ic_center(states["pnp_df"], states["reference"].shape, component_index)
+
+    ic1_position = np.float32([
+        states["pnp_df"].iloc[25][1] * states["gerber"].shape[1] / 0.05 / 90,
+        states["pnp_df"].iloc[25][1] * states["gerber"].shape[0] / 0.05 / 90,
+        0
+    ]).reshape(3,1)
+    rmat = cv.Rodrigues(states["pcb_rvecs"])[0]
+    ic1_camera_point = (np.matmul(rmat, ic1_position) + states["pcb_tvecs"]).reshape(3)
+    states["component_position_camera"] = ic1_camera_point
+
+    ic1_camera_point_yzflip = np.float32([ic1_camera_point[0],ic1_camera_point[2], ic1_camera_point[1]])
+    states["component_position_arm"] = (
+        np.matmul(tiago_head_arm_transform_cache["rmat"], ic1_camera_point_yzflip/1000) + tiago_head_arm_transform_cache["tvec"]
+    ).reshape(3)
+    print("camera: ", states["component_position_camera"])
+    print("arm: ", states["component_position_arm"])
+    
+
+def set_component_index(states):
+    component_index = input("Enter component_index:")
+    states["component_index"] = component_index
+    print(f"Selected component {component_index}: {states['pnp_df'].iloc[component_index][0]}")
+
+
+def move_arm_over_component(states):
+    topic = roslibpy.Topic(states["client"], '/thk_ns/thk_tiago_xya', 'std_msgs/String')
+
+    target = {"x": states["component_position_arm"][1], "y": -states["component_position_arm"][0], "angle": math.pi/2}
+    print("move to: ", target)
+
+    topic.publish(target)
+
+def move_head(states):
+    topic = roslibpy.Topic(states["client"], '/head_controller/command', 'std_msgs/String')
+
+    topic.publish(
+        {
+            "joint_names":  ["head_1_joint", "head_2_joint"],
+            "points": [{"positions": [0.0, -0.85], "time_from_start": {"secs": 1}}]
+        }
+    )
+
+def reset_arm(states):
+    topic = roslibpy.Topic(states["client"], '/thk_ns/thk_tiago_xya', 'std_msgs/String')
+
+    topic.publish({"x": 0.1, "y": 0.95, "angle": math.pi/2})
+
+def show_head_transform(states):
+    print(tiago_head_arm_transform_cache)
+    print()
+
+
+# State
+states = {
+    "client": None,
+
+    "K": None,
+    "K_inv": None,
+    "K_head": None,
+    "K_head_inv": None,
+    "K_gripper": None,
+    "K_gripper_inv": None,
+
+    "gerber": None,
+    "gerber_size_mm": None,
+    "reference": None,
+    "pnp_df": None,
+
+    "pcb_rvecs": None,
+    "pcb_tvecs": None,
+    "component_index": None,
+    "component_position_camera": None,
+    "component_position_arm": None,
+}
+
+def end(states):
+    states["client"].terminate()
+    exit()
+
+# Commands
+commands = {
+    "end": end,
+    "hello": printhello,
+    "detect_cutout": detect_cutout,
+    "detect_component": detect_component,
+    "detect_pcb": detect_pcb,
+    "calculate_component_pcb_position": calculate_component_pcb_position,
+    "set_component_index": set_component_index,
+    "move_arm_over_component": move_arm_over_component,
+    "move_head": move_head,
+    "reset_arm": reset_arm,
+    "show_head_transform": show_head_transform,
+}
+
+def main():
+
+    setup(states)
+
+    while True:
+        command = input("\nAvailable commands: \n\n" + "\n".join([f"{i}: {s}" for i, s in enumerate(commands.keys())]) + "\n\n")
+        print("\n*", command, "*\n")
+        try:
+            command = int(command)
+        
+            if command == "end" or command == 0:
+                end(states)
+            if type(command) is str:
+                commands[command](states)
+            if type(command) is int:
+                list(commands.values())[command](states)
+        except:
+            print("Invalid Command")
+    
+
 if __name__ == "__main__":
-    main_fused()
+    main()

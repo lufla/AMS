@@ -11,7 +11,7 @@ CAMERA_WEBCAM = 1
 CAMERA_HEAD = 2
 CAMERA_GRIPPER = 3
 
-CAMERA = CAMERA_HEAD
+CAMERA = CAMERA_WEBCAM
 
 # https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html
 
@@ -37,7 +37,7 @@ if CAMERA == CAMERA_WEBCAM: file_extension = "png"
 if CAMERA == CAMERA_HEAD: file_extension = "jpg"
 if CAMERA == CAMERA_GRIPPER: file_extension = "jpg"
 
-images = glob.glob(f"PCB_Detection_2/calibration/{camera_dir}/*.{file_extension}")
+images = glob.glob(f"pcb_detection/calibration/{camera_dir}/*.{file_extension}")
 
 for fname in images:
     img = cv.imread(fname)
@@ -79,6 +79,13 @@ for fname in images:
     with open(".env.json", "w") as f:
         json.dump(config_json, f, indent=2)
 
+mean_error = 0
+for i in range(len(objpoints)):
+    imgpoints2, _ = cv.projectPoints(objpoints[i], rvecs[i], tvecs[i], mtx, dist)
+    error = cv.norm(imgpoints[i], imgpoints2, cv.NORM_L2)/len(imgpoints2)
+    mean_error += error
+ 
+print( "total error: {}".format(mean_error/len(objpoints)) )
 
 while True:
     if cv.waitKey(1) & 0xFF == ord('q'):

@@ -1,0 +1,14 @@
+# pip install -r PCB_Detection_2/requirements.txt
+
+--extra-index-url https://download.pytorch.org/whl/cu118
+torch
+torchvision
+torchaudio
+
+numpy
+opencv-python
+pandas
+roslibpy
+scipy
+python-dotenv
+easyocr

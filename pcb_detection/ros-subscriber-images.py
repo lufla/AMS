@@ -4,8 +4,6 @@ import time
 import roslibpy
 import cv2 as cv
 import roslibpy.comm
-from cv_bridge import CvBridge
-from sensor_msgs.msg import CompressedImage, Image
 import numpy as np
 
 # http://wiki.ros.org/cv_bridge/Tutorials/ConvertingBetweenROSImagesAndOpenCVImagesPython
@@ -16,7 +14,6 @@ config = dotenv_values(".env")
 client = roslibpy.Ros(host=config["ros_host"], port=9090)
 client.run()
 
-bridge = CvBridge()
 
 HEAD = 2
 GRIPPER = 3
@@ -38,22 +35,9 @@ def display_image_msg(message):
         return
     else:
         next_frame_time += 2 * 1E9
-    
-    image_value = CompressedImage()
-    image_value.header.seq = message['header']['seq']
-    image_value.header.stamp.secs = message['header']['stamp']['secs']
-    image_value.header.stamp.nsecs = message['header']['stamp']['nsecs']
-    image_value.header.frame_id = message['header']['frame_id']
-    #image_value.height = message['height']
-    #image_value.width = message['width']
-    #image_value.encoding = message['encoding']
-    #image_value.is_bigendian = message['is_bigendian']
-    #image_value.step = message['step']
-    #image_value.format = message['format']
 
     base64_bytes = message['data'].encode('ascii')
     image_bytes = base64.b64decode(base64_bytes)
-    image_value.data = image_bytes
 
     jpg_as_np = np.frombuffer(image_bytes, dtype=np.uint8)
     image_cv = cv.imdecode(jpg_as_np, cv.IMREAD_COLOR)
@@ -62,11 +46,9 @@ def display_image_msg(message):
     ms = int(time.time_ns() / 1_000_000)
     if CAMERA == HEAD: camera_dir = "head"
     if CAMERA == GRIPPER: camera_dir = "gripper"
-    filename = f"PCB_Detection_2/calibration/tiago/{camera_dir}/{ms}.jpg"
+    filename = f"pcb_detection/calibration/tiago/{camera_dir}/{ms}.jpg"
     
     if SAVE_IMAGES: cv.imwrite(filename=filename, img=image_cv)
-
-    #image_cv = bridge.imgmsg_to_cv2(image_value, desired_encoding='passthrough')
 
     cv.imshow("image", image_cv)
 
