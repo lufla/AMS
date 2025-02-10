@@ -101,7 +101,7 @@ SAVE_IMAGES = True
 ```
 
 The script will take an image every 2 seconds.
-To stop recording press ```q```.
+To stop recording press ```q``` in the image window.
 
 The images will be saved in ```PCB_Detection_2/calibration/tiago/```.
 
@@ -115,6 +115,9 @@ CAMERA = CAMERA_WEBCAM
 CAMERA = CAMERA_HEAD
 CAMERA = CAMERA_GRIPPER
 ```
+
+The calibration script will display the image and highlight the detected key points.
+After the calibration is done it will output the mean reprojection error.
 
 ## Usage
 
@@ -169,6 +172,17 @@ rosrun my_controller_pkg thk_arm_xya2
 ```
 
 #### Python Scripts
+
+main.py
+main_detection.py
+main_manual.py
+
+ros-subscriber-images.py?
+take_calibration_images.py?
+
+roslibpy-arm-test.py
+roslibpy-head-test.py
+
 
 TODO
 images
