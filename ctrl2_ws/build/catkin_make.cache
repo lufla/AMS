@@ -1,2 +1,0 @@
-my_controller_pkg
--DCATKIN_DEVEL_PREFIX=/media/pal/INTENSO/ctrl2_ws/devel -DCMAKE_INSTALL_PREFIX=/media/pal/INTENSO/ctrl2_ws/install -G Unix Makefiles
