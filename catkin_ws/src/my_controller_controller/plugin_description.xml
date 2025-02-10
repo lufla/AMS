@@ -1,8 +1,0 @@
-<library path="lib/libmy_controller_controller">
-  <class name="my_controller_controller/MyController"
-         type="my_controller_controller::MyController"
-         base_class_type="controller_interface::ControllerBase">
-    <description>My custom ROS controller</description>
-  </class>
-</library>
-
