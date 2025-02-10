@@ -208,6 +208,8 @@ Additionally the gripper rotation has to be given.
 
 All angles are measured in radians and distances are measured in meters.
 
+---
+
 The script ```main_manual.py``` can perform multiple commands.
 
 ```end```: Stops the script.
