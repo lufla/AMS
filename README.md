@@ -45,7 +45,7 @@ git clone https://github.com/lufla/AMS.git
 ```
 
 #### Env Config
-Copy the files ```example.env``` and ```example.env.json``` from the directory ```PCB_Detection_2/``` into to root directory of the git repository ```AMS/``` and rename them to ```.env``` and ```.env.json```.
+Copy the files ```example.env``` and ```example.env.json``` from the directory ```pcb_detection/``` into to root directory of the git repository ```AMS/``` and rename them to ```.env``` and ```.env.json```.
 
 Adjust the camera parameters in the ```.env``` file if necessary.
 
@@ -53,7 +53,7 @@ Adjust the camera parameters in the ```.env``` file if necessary.
 
 To install the needed python dependencies execute the following command.
 ```bash
-pip install -r PCB_Detection_2/requirements.txt
+pip install -r pcb_detection/requirements.txt
 ``` 
 
 
@@ -98,7 +98,11 @@ SAVE_IMAGES = True
 The script will take an image every 2 seconds.
 To stop recording press ```q``` in the image window.
 
+<<<<<<< HEAD
 The images will be saved in ```PCB_Detection_2/calibration/```.
+=======
+The images will be saved in ```pcb_detection/calibration/tiago/```.
+>>>>>>> cf10c9c7c64a7632d2293eeab01f79391590dbcc
 
 For calibrating the webcam you can use the ```take_calibration_images.py``` python script.
 
